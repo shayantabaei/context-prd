@@ -1,29 +1,42 @@
+import {
+  CheckCircle2,
+  CircleHelp,
+  Database,
+  FileText,
+  Shield
+} from "lucide-react";
 import { SectionHeader } from "./SectionHeader";
 
 const prdSections = [
   {
     title: "Goals",
-    copy: "Define measurable product and engineering outcomes tied to the initiative."
+    copy: "Define measurable product and engineering outcomes tied to the initiative.",
+    icon: CheckCircle2
   },
   {
     title: "Functional requirements",
-    copy: "Translate intake answers into traceable, testable user and system behavior."
+    copy: "Translate intake answers into traceable, testable user and system behavior.",
+    icon: FileText
   },
   {
     title: "Architecture considerations",
-    copy: "Surface service boundaries, dependency impacts, observability, and rollout constraints."
+    copy: "Surface service boundaries, dependency impacts, observability, and rollout constraints.",
+    icon: Database
   },
   {
     title: "Security considerations",
-    copy: "Apply internal security review standards and identify privacy or permission risks."
+    copy: "Apply internal security review standards and identify privacy or permission risks.",
+    icon: Shield
   },
   {
     title: "Acceptance criteria",
-    copy: "Create QA-ready criteria that match the organization's release workflow."
+    copy: "Create QA-ready criteria that match the organization's release workflow.",
+    icon: CheckCircle2
   },
   {
     title: "Open questions",
-    copy: "Call out unresolved decisions instead of letting generic assumptions leak into the PRD."
+    copy: "Call out unresolved decisions instead of letting generic assumptions leak into the PRD.",
+    icon: CircleHelp
   }
 ];
 
@@ -47,7 +60,8 @@ export function ProductPreview() {
                 Partner Permissions Expansion
               </h3>
             </div>
-            <span className="hidden rounded-md border border-line bg-surface-raised px-3 py-1.5 text-xs text-zinc-300 sm:inline-flex">
+            <span className="hidden items-center gap-2 rounded-md border border-line bg-surface-raised px-3 py-1.5 text-xs text-zinc-300 sm:inline-flex">
+              <CheckCircle2 className="h-4 w-4 text-zinc-500" strokeWidth={1.8} />
               Ready for review
             </span>
           </div>
@@ -55,9 +69,13 @@ export function ProductPreview() {
             {prdSections.map((section) => (
               <article
                 key={section.title}
-                className="rounded-lg border border-line bg-[#101014] p-4"
+                className="rounded-lg border border-line bg-[#101014] p-4 transition duration-200 hover:border-line-strong"
               >
-                <h4 className="text-sm font-semibold text-zinc-100">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                  <section.icon
+                    className="h-4 w-4 shrink-0 text-zinc-500"
+                    strokeWidth={1.8}
+                  />
                   {section.title}
                 </h4>
                 <p className="mt-3 text-sm leading-6 text-zinc-400">

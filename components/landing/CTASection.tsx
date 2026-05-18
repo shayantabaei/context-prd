@@ -1,3 +1,5 @@
+import { Sparkles } from "lucide-react";
+
 export function CTASection() {
   return (
     <section id="final-cta" className="px-5 py-24 sm:px-8 lg:px-10">
@@ -14,8 +16,9 @@ export function CTASection() {
         </p>
         <a
           href="#"
-          className="mt-8 inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
+          className="mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
         >
+          <Sparkles className="h-4 w-4" strokeWidth={1.9} />
           Create first PRD
         </a>
       </div>

@@ -1,30 +1,60 @@
+import { FileText, Menu, Sparkles, Workflow } from "lucide-react";
 import { ProductMockup } from "./ProductMockup";
 
 export function LandingHero() {
   return (
     <section className="relative border-b border-line">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between">
-          <a href="#" className="flex items-center gap-3" aria-label="ContextPRD home">
-            <span className="grid h-8 w-8 place-items-center rounded-md border border-blue-400/30 bg-blue-500/15 text-sm font-semibold text-blue-200">
-              C
-            </span>
-            <span className="text-sm font-semibold tracking-[-0.01em] text-zinc-100">
+      <header className="border-b border-white/10 bg-[#0b0b0d]">
+        <div className="mx-auto grid h-14 max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-5 sm:px-8 lg:grid-cols-[1fr_auto_1fr] lg:px-10">
+          <a
+            href="#"
+            className="flex items-center gap-3"
+            aria-label="ContextPRD home"
+          >
+            <FileText className="h-5 w-5 text-blue-400" strokeWidth={1.9} />
+            <span className="text-sm font-semibold tracking-[-0.01em] text-white">
               ContextPRD
             </span>
           </a>
-          <nav className="hidden items-center gap-7 text-sm text-zinc-400 md:flex">
-            <a href="#workflow" className="transition hover:text-zinc-100">
-              Workflow
+
+          <nav className="hidden items-center justify-center gap-8 text-sm font-medium text-zinc-300 lg:flex">
+            <a href="#workflow" className="transition hover:text-white">
+              How it works
             </a>
-            <a href="#preview" className="transition hover:text-zinc-100">
-              Preview
+            <a href="#preview" className="transition hover:text-white">
+              Features
             </a>
-            <a href="#security" className="transition hover:text-zinc-100">
-              Security
+            <a href="#security" className="transition hover:text-white">
+              Enterprise
             </a>
           </nav>
-        </header>
+
+          <div className="hidden items-center justify-end gap-4 lg:flex">
+            <a
+              href="#"
+              className="text-sm font-medium text-zinc-300 transition hover:text-white"
+            >
+              Sign In
+            </a>
+            <a
+              href="#final-cta"
+              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-blue-400"
+            >
+              Get Started
+            </a>
+          </div>
+
+          <button
+            type="button"
+            className="grid h-9 w-9 place-items-center justify-self-end rounded-md text-zinc-300 transition hover:bg-white/[0.04] hover:text-white lg:hidden"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="h-4 w-4" strokeWidth={1.9} />
+          </button>
+        </div>
+      </header>
+
+      <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-7xl flex-col px-5 py-4 sm:px-8 lg:px-10">
 
         <div className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:py-16">
           <div className="max-w-3xl">
@@ -43,14 +73,16 @@ export function LandingHero() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a
                 href="#final-cta"
-                className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
               >
+                <Sparkles className="h-4 w-4" strokeWidth={1.9} />
                 Start generating PRDs
               </a>
               <a
                 href="#workflow"
-                className="inline-flex h-11 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900/50 px-5 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/50 px-5 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800"
               >
+                <Workflow className="h-4 w-4 text-zinc-400" strokeWidth={1.9} />
                 View workflow
               </a>
             </div>

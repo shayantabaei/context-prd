@@ -1,41 +1,57 @@
-import { SectionHeader } from "./SectionHeader";
+import {
+  Blocks,
+  Library,
+  Search,
+  Sparkles
+} from "lucide-react";
 
 const steps = [
-  "Connect Confluence",
-  "Select internal standards and templates",
-  "Complete structured intake",
-  "Generate an enterprise-ready PRD",
-  "Review, edit, and export"
+  {
+    title: "Connect",
+    detail: "Securely sync your internal knowledge sources.",
+    icon: Blocks
+  },
+  {
+    title: "Scope",
+    detail: "Define high-level goals and technical requirements.",
+    icon: Library
+  },
+  {
+    title: "Select Context",
+    detail: "Pick specific docs or projects to ground the AI.",
+    icon: Search
+  },
+  {
+    title: "Generate",
+    detail: "Review a comprehensive, engineering-ready PRD.",
+    icon: Sparkles
+  }
 ];
 
 export function WorkflowSteps() {
   return (
-    <section id="workflow" className="border-b border-line px-5 py-24 sm:px-8 lg:px-10">
+    <section
+      id="workflow"
+      className="border-b border-line px-5 py-24 sm:px-8 lg:px-10"
+    >
       <div className="mx-auto max-w-7xl">
-        <SectionHeader
-          eyebrow="Workflow"
-          title="From internal knowledge to review-ready PRD"
-          description="A controlled flow keeps generation grounded in approved sources while preserving the judgment of product and engineering leads."
-        />
-        <div className="mt-12 grid gap-3 lg:grid-cols-5">
-          {steps.map((step, index) => (
-            <article
-              key={step}
-              className="relative rounded-lg border border-line bg-surface p-5"
-            >
-              <p className="font-mono text-xs text-blue-300">
-                {String(index + 1).padStart(2, "0")}
-              </p>
-              <h3 className="mt-8 min-h-14 text-lg font-semibold leading-7 tracking-[-0.01em] text-zinc-50">
-                {step}
-              </h3>
-              <div className="mt-6 h-1 rounded-full bg-zinc-800">
-                <div
-                  className="h-1 rounded-full bg-blue-500"
-                  style={{ width: `${(index + 1) * 20}%` }}
-                />
+        <h2 className="mx-auto max-w-4xl text-center text-3xl font-semibold leading-tight tracking-[-0.02em] text-zinc-50 sm:text-4xl lg:text-5xl">
+          From Source to Spec in Seconds
+        </h2>
+
+        <div className="mt-16 grid gap-14 md:grid-cols-2 lg:grid-cols-4 lg:gap-10">
+          {steps.map(({ title, detail, icon: Icon }, index) => (
+            <div key={title} className="flex flex-col items-center text-center">
+              <div className="grid h-16 w-16 place-items-center rounded-full bg-blue-500">
+                <Icon className="h-7 w-7 text-white" strokeWidth={1.8} />
               </div>
-            </article>
+              <h3 className="mt-6 text-lg font-semibold tracking-[-0.01em] text-zinc-50">
+                {index + 1}. {title}
+              </h3>
+              <p className="mt-3 max-w-64 text-sm leading-6 text-zinc-400">
+                {detail}
+              </p>
+            </div>
           ))}
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { Database, FileText, Sparkles } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 import { SectionHeader } from "./SectionHeader";
 
@@ -6,19 +7,22 @@ const values = [
     label: "Problem",
     title: "Generic PRDs miss the engineering reality",
     description:
-      "Most generated requirements ignore platform constraints, operational standards, review gates, and how teams actually ship software."
+      "Most generated requirements ignore platform constraints, operational standards, review gates, and how teams actually ship software.",
+    icon: FileText
   },
   {
     label: "Context",
     title: "Company knowledge becomes the source of truth",
     description:
-      "Teams choose the Confluence spaces, architecture standards, templates, and workflows that should shape the draft."
+      "Teams choose the Confluence spaces, architecture standards, templates, and workflows that should shape the draft.",
+    icon: Database
   },
   {
     label: "Outcome",
     title: "PRDs arrive ready for execution",
     description:
-      "Generated sections include implementation constraints, security considerations, QA criteria, and open questions for review."
+      "Generated sections include implementation constraints, security considerations, QA criteria, and open questions for review.",
+    icon: Sparkles
   }
 ];
 
