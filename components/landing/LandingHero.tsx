@@ -31,13 +31,13 @@ export function LandingHero() {
 
           <div className="hidden items-center justify-end gap-4 lg:flex">
             <a
-              href="#"
+              href="/signin"
               className="text-sm font-medium text-zinc-300 transition hover:text-white"
             >
               Sign In
             </a>
             <a
-              href="#final-cta"
+              href="/signin"
               className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-blue-400"
             >
               Get Started
@@ -71,7 +71,7 @@ export function LandingHero() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a
-                href="#final-cta"
+                href="/signin"
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
               >
                 <Sparkles className="h-4 w-4" strokeWidth={1.9} />
