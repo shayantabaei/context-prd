@@ -42,7 +42,7 @@ export function TrustSection() {
           title="Serious AI workflows need controlled context"
           description="ContextPRD is designed for enterprise SDLC teams that need grounded outputs, audit-friendly review, and workflow alignment before anything reaches implementation."
         />
-        <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {trustItems.map((item) => (
             <FeatureCard key={item.title} {...item} />
           ))}

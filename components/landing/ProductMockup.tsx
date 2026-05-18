@@ -57,7 +57,7 @@ export function ProductMockup() {
               87 grounded references
             </p>
             <p className="mt-1 text-xs leading-5 text-zinc-400">
-              Only user-selected Confluence spaces and templates are used.
+              Only user-selected sources and internal templates are used.
             </p>
           </div>
         </aside>

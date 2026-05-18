@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 export function CTASection() {
   return (
     <section id="final-cta" className="px-5 py-24 sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-5xl rounded-xl border border-line bg-surface p-8 text-center sm:p-12">
+      <div className="mx-auto max-w-5xl rounded-xl border border-line bg-surface p-8 text-center sm:p-14">
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">
           Create the first draft
         </p>
@@ -11,8 +11,8 @@ export function CTASection() {
           Turn company knowledge into an engineering-ready PRD
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-zinc-400">
-          Start with approved Confluence context, internal templates, and SDLC
-          expectations so your next PRD is specific from the first pass.
+          Start with approved organizational context, internal templates, and
+          SDLC expectations so your next PRD is specific from the first pass.
         </p>
         <a
           href="#"

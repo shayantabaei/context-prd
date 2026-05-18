@@ -56,19 +56,18 @@ export function LandingHero() {
 
       <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-7xl flex-col px-5 py-4 sm:px-8 lg:px-10">
 
-        <div className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:py-16">
+        <div className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-[0.9fr_1.1fr] lg:py-16">
           <div className="max-w-3xl">
             <p className="mb-5 w-fit rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.16em] text-blue-200">
               Company-context-aware PRDs
             </p>
             <h1 className="text-4xl font-semibold leading-[1.05] tracking-[-0.02em] text-zinc-50 sm:text-5xl lg:text-5xl 2xl:text-6xl">
-              Generate engineering-ready PRDs from your company&apos;s
-              Confluence knowledge
+              Turn company knowledge into engineering-ready PRDs
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
-              ContextPRD uses your internal standards, architecture docs, SDLC
-              workflows, and product templates to create PRDs that engineering,
-              product, and QA teams can actually execute.
+              ContextPRD grounds every draft in internal standards, architecture
+              guidance, SDLC workflows, and approved sources so product,
+              engineering, and QA teams can align faster.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a

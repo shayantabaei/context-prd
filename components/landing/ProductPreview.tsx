@@ -43,7 +43,7 @@ const prdSections = [
 export function ProductPreview() {
   return (
     <section id="preview" className="border-b border-line px-5 py-24 sm:px-8 lg:px-10">
-      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+      <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
         <SectionHeader
           align="left"
           eyebrow="Generated structure"

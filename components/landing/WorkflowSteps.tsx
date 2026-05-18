@@ -35,11 +35,11 @@ export function WorkflowSteps() {
       className="border-b border-line px-5 py-24 sm:px-8 lg:px-10"
     >
       <div className="mx-auto max-w-7xl">
-        <h2 className="mx-auto max-w-4xl text-center text-3xl font-semibold leading-tight tracking-[-0.02em] text-zinc-50 sm:text-4xl lg:text-5xl">
-          From Source to Spec in Seconds
+        <h2 className="mx-auto max-w-5xl text-center text-3xl font-semibold leading-tight tracking-[-0.02em] text-zinc-50 sm:text-4xl lg:text-5xl">
+          From company context to delivery-ready PRDs
         </h2>
 
-        <div className="mt-16 grid gap-14 md:grid-cols-2 lg:grid-cols-4 lg:gap-10">
+        <div className="mt-[4.5rem] grid gap-14 md:grid-cols-2 lg:grid-cols-4 lg:gap-10">
           {steps.map(({ title, detail, icon: Icon }, index) => (
             <div key={title} className="flex flex-col items-center text-center">
               <div className="grid h-16 w-16 place-items-center rounded-full bg-blue-500">

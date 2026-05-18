@@ -14,7 +14,7 @@ const values = [
     label: "Context",
     title: "Company knowledge becomes the source of truth",
     description:
-      "Teams choose the Confluence spaces, architecture standards, templates, and workflows that should shape the draft.",
+      "Teams choose the approved sources, architecture standards, templates, and workflows that should shape the draft.",
     icon: Database
   },
   {
@@ -35,7 +35,7 @@ export function ProblemValue() {
           title="PRDs should reflect how your engineering organization delivers"
           description="ContextPRD turns internal operating knowledge into structured requirements, replacing vague AI drafts with grounded product specs shaped by your company context."
         />
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
+        <div className="mt-14 grid gap-4 md:grid-cols-3">
           {values.map((value) => (
             <FeatureCard key={value.title} {...value} />
           ))}
