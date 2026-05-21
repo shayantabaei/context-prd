@@ -18,7 +18,7 @@ const steps = [
   },
   {
     title: "Select Context",
-    detail: "Pick specific docs or projects to ground the AI.",
+    detail: "Pick specific docs or initiatives to ground the AI.",
     icon: Search
   },
   {
