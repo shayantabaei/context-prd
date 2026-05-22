@@ -45,7 +45,7 @@ export const updateInitiativeRequestSchema = initiativeSchema.partial();
 export const documentAnalysisSchema = z.object({
   documentId: z.number().int().positive(),
   filename: nonEmptyString,
-  relevancyScore: z.number().min(0).max(100),
+  relevancyScore: z.number().min(0).max(1),
   summary: nonEmptyString,
   relevantTopics: z.array(nonEmptyString),
   potentiallyIrrelevantTopics: z.array(nonEmptyString),

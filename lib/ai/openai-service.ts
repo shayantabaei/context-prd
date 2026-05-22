@@ -35,17 +35,40 @@ export async function analyzeInitiativeWithAi(
   documents: ContextDocument[]
 ): Promise<InitiativeAnalysis> {
   if (!hasOpenAiApiKey()) {
+    console.info("[ContextPRD analyze] using mock analysis fallback", {
+      reason: "OPENAI_API_KEY is not configured",
+      initiativeId: initiative.id,
+      documentCount: documents.length,
+      processedDocumentCount: documents.filter(
+        (document) => document.processingStatus === "processed"
+      ).length
+    });
+
     return initiativeAnalysisSchema.parse(
       createMockInitiativeAnalysis(initiative, documents)
     );
   }
+
+  const model = getDefaultOpenAiModel();
+
+  console.info("[ContextPRD analyze] calling OpenAI", {
+    initiativeId: initiative.id,
+    model,
+    documentCount: documents.length,
+    documents: documents.map((document) => ({
+      id: document.id,
+      filename: document.filename,
+      processingStatus: document.processingStatus,
+      extractedCharacters: document.extractedText?.length ?? 0
+    }))
+  });
 
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
   });
 
   const response = await client.chat.completions.create({
-    model: getDefaultOpenAiModel(),
+    model,
     temperature: 0.2,
     response_format: { type: "json_object" },
     messages: [
@@ -72,7 +95,7 @@ export async function analyzeInitiativeWithAi(
       ? (parsed as Record<string, unknown>)
       : {};
 
-  return initiativeAnalysisSchema.parse({
+  const analysis = initiativeAnalysisSchema.parse({
     ...parsedObject,
     initiativeId: initiative.id,
     createdAt:
@@ -80,4 +103,16 @@ export async function analyzeInitiativeWithAi(
         ? parsedObject.createdAt
         : new Date().toISOString()
   });
+
+  console.info("[ContextPRD analyze] OpenAI analysis validated", {
+    initiativeId: initiative.id,
+    model,
+    documentAnalysisCount: analysis.documentAnalysis.length,
+    gapCount: analysis.detectedGaps.length,
+    riskCount: analysis.detectedRisks.length,
+    dependencyCount: analysis.inferredDependencies.length,
+    clarificationQuestionCount: analysis.clarificationQuestions.length
+  });
+
+  return analysis;
 }

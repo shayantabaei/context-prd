@@ -19,7 +19,7 @@ export function createMockInitiativeAnalysis(
     documentAnalysis: documents.map((document) => ({
       documentId: document.id,
       filename: document.filename,
-      relevancyScore: document.processingStatus === "processed" ? 78 : 10,
+      relevancyScore: document.processingStatus === "processed" ? 0.78 : 0.1,
       summary:
         document.processingStatus === "processed"
           ? `Contains supporting context that may inform ${initiative.initiativeName}, especially implementation boundaries and operational constraints.`

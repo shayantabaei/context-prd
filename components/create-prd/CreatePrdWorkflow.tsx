@@ -928,21 +928,37 @@ function DocumentStatusRow({ document }: { document: ContextDocument }) {
   );
 }
 
+function getRelevancyPercentage(score: number): number {
+  return Math.max(0, Math.min(100, Math.round(score * 100)));
+}
+
+function formatRelevancyScore(score: number): string {
+  return `${getRelevancyPercentage(score)}%`;
+}
+
 function DocumentAnalysisCard({ document }: { document: DocumentAnalysis }) {
+  const relevancyPercentage = getRelevancyPercentage(document.relevancyScore);
+
   return (
     <article className="rounded-lg border border-line bg-[#101014] p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-100">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-zinc-100" title={document.filename}>
             {document.filename}
           </h3>
           <p className="mt-2 text-sm leading-6 text-zinc-500">
             {document.summary}
           </p>
         </div>
-        <span className="shrink-0 rounded-md border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-200">
-          {document.relevancyScore}% relevant
+        <span className="shrink-0 whitespace-nowrap rounded-md border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-200">
+          {formatRelevancyScore(document.relevancyScore)} relevant
         </span>
+      </div>
+      <div className="mt-4 h-1.5 rounded-full bg-zinc-800">
+        <div
+          className="h-1.5 rounded-full bg-blue-400"
+          style={{ width: `${relevancyPercentage}%` }}
+        />
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <TopicList title="Relevant topics" topics={document.relevantTopics} />
