@@ -1,6 +1,7 @@
 import type {
   ContextDocument,
   CreateInitiativeRequest,
+  GeneratedPrd,
   Initiative,
   InitiativeAnalysis,
   UpdateInitiativeRequest,
@@ -79,4 +80,19 @@ export async function analyzeInitiativeRequest(
   });
 
   return parseApiResponse<InitiativeAnalysis>(response);
+}
+
+export async function generatePrdRequest(
+  initiativeId: number,
+  clarificationAnswers: { questionId: number; answer: string }[]
+): Promise<GeneratedPrd> {
+  const response = await fetch(`/api/initiatives/${initiativeId}/generate-prd`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ clarificationAnswers })
+  });
+
+  return parseApiResponse<GeneratedPrd>(response);
 }

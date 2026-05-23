@@ -1,7 +1,9 @@
 import type {
   ContextDocument,
   CreateInitiativeRequest,
+  GeneratedPrd,
   Initiative,
+  InitiativeAnalysis,
   UpdateInitiativeRequest
 } from "@/lib/types/initiative";
 
@@ -10,6 +12,8 @@ type StoreState = {
   nextDocumentId: number;
   initiatives: Initiative[];
   documents: ContextDocument[];
+  analyses: InitiativeAnalysis[];
+  generatedPrds: GeneratedPrd[];
 };
 
 const globalStore = globalThis as typeof globalThis & {
@@ -22,7 +26,9 @@ const store: StoreState =
     nextInitiativeId: 1,
     nextDocumentId: 1,
     initiatives: [],
-    documents: []
+    documents: [],
+    analyses: [],
+    generatedPrds: []
   };
 
 globalStore.__contextPrdStore = store;
@@ -89,9 +95,37 @@ export function getDocumentsForInitiative(initiativeId: number): ContextDocument
   return store.documents.filter((document) => document.initiativeId === initiativeId);
 }
 
+export function saveInitiativeAnalysis(analysis: InitiativeAnalysis): InitiativeAnalysis {
+  store.analyses = [
+    ...store.analyses.filter((item) => item.initiativeId !== analysis.initiativeId),
+    analysis
+  ];
+
+  return analysis;
+}
+
+export function getLatestInitiativeAnalysis(
+  initiativeId: number
+): InitiativeAnalysis | undefined {
+  return store.analyses
+    .filter((analysis) => analysis.initiativeId === initiativeId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+}
+
+export function saveGeneratedPrd(prd: GeneratedPrd): GeneratedPrd {
+  store.generatedPrds = [
+    ...store.generatedPrds.filter((item) => item.initiativeId !== prd.initiativeId),
+    prd
+  ];
+
+  return prd;
+}
+
 export function clearStoreForTests() {
   store.nextInitiativeId = 1;
   store.nextDocumentId = 1;
   store.initiatives = [];
   store.documents = [];
+  store.analyses = [];
+  store.generatedPrds = [];
 }
