@@ -7,14 +7,6 @@ export type MetricEntry = {
   target: string;
 };
 
-export type DependencyReference = {
-  id: string;
-  name: string;
-  relationship: string;
-  impact: "High" | "Medium" | "Low";
-  selected: boolean;
-};
-
 export function TextField({
   id,
   label,
@@ -249,61 +241,6 @@ export function GovernanceCallout({
           <p className="mt-2 text-sm leading-6 text-zinc-400">{children}</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-export function DependencyReferences({
-  systems,
-  onToggle
-}: {
-  systems: DependencyReference[];
-  onToggle: (id: string) => void;
-}) {
-  const toneByImpact: Record<DependencyReference["impact"], string> = {
-    High: "border-amber-400/20 bg-amber-400/10 text-amber-200",
-    Medium: "border-blue-500/20 bg-blue-500/10 text-blue-200",
-    Low: "border-line bg-[#101014] text-zinc-400"
-  };
-
-  return (
-    <div>
-      <p className="text-sm font-medium text-zinc-300">
-        Related Systems & Dependencies
-      </p>
-      <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {systems.map((system) => (
-          <button
-            key={system.id}
-            type="button"
-            onClick={() => onToggle(system.id)}
-            aria-pressed={system.selected}
-            className={
-              system.selected
-                ? "rounded-lg border border-blue-500/35 bg-blue-500/10 p-4 text-left"
-                : "rounded-lg border border-line bg-[#101014] p-4 text-left transition hover:border-white/16"
-            }
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-zinc-100">
-                {system.name}
-              </span>
-              <span
-                className={`rounded-md border px-2 py-1 text-[11px] font-medium ${toneByImpact[system.impact]}`}
-              >
-                {system.impact} impact
-              </span>
-            </div>
-            <p className="mt-3 text-xs leading-5 text-zinc-500">
-              {system.relationship}
-            </p>
-          </button>
-        ))}
-      </div>
-      <p className="mt-2 text-xs leading-5 text-zinc-500">
-        System references will later inform architecture graph analysis and
-        dependency inference.
-      </p>
     </div>
   );
 }

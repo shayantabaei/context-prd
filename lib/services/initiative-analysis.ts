@@ -1,6 +1,10 @@
 import { analyzeInitiativeWithAi } from "@/lib/ai/openai-service";
 import type { InitiativeAnalysis } from "@/lib/types/initiative";
-import { getDocumentsForInitiative, getInitiative } from "./initiative-store";
+import {
+  getDocumentsForInitiative,
+  getInitiative,
+  saveInitiativeAnalysis
+} from "./initiative-store";
 
 export async function analyzeInitiative(
   initiativeId: number
@@ -13,5 +17,7 @@ export async function analyzeInitiative(
 
   const documents = getDocumentsForInitiative(initiativeId);
 
-  return analyzeInitiativeWithAi(initiative, documents);
+  const analysis = await analyzeInitiativeWithAi(initiative, documents);
+
+  return saveInitiativeAnalysis(analysis);
 }

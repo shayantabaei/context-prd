@@ -108,3 +108,35 @@ export type ClarificationQuestion = {
   severity: "low" | "medium" | "high";
   relatedSystems?: string[];
 };
+
+export type ClarificationAnswer = {
+  questionId: number;
+  answer: string;
+};
+
+export type GeneratePrdRequest = {
+  clarificationAnswers: ClarificationAnswer[];
+};
+
+export type GeneratedPrd = {
+  initiativeId: number;
+  title: string;
+  summary: string;
+  sections: PrdSection[];
+  openQuestions: string[];
+  generatedAt: string;
+};
+
+export type PrdSection = {
+  id: string;
+  title: string;
+  content: string;
+  sourceReferences: SourceReference[];
+};
+
+export type SourceReference = {
+  documentId?: number;
+  filename?: string;
+  clarificationQuestionId?: number;
+  label: string;
+};

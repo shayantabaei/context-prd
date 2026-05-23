@@ -103,3 +103,35 @@ export const initiativeAnalysisSchema = z.object({
   clarificationQuestions: z.array(clarificationQuestionSchema),
   createdAt: z.string().datetime()
 });
+
+export const clarificationAnswerSchema = z.object({
+  questionId: z.number().int().positive(),
+  answer: z.string().trim()
+});
+
+export const generatePrdRequestSchema = z.object({
+  clarificationAnswers: z.array(clarificationAnswerSchema)
+});
+
+export const sourceReferenceSchema = z.object({
+  documentId: z.number().int().positive().optional(),
+  filename: z.string().trim().optional(),
+  clarificationQuestionId: z.number().int().positive().optional(),
+  label: nonEmptyString
+});
+
+export const prdSectionSchema = z.object({
+  id: nonEmptyString,
+  title: nonEmptyString,
+  content: nonEmptyString,
+  sourceReferences: z.array(sourceReferenceSchema)
+});
+
+export const generatedPrdSchema = z.object({
+  initiativeId: z.number().int().positive(),
+  title: nonEmptyString,
+  summary: nonEmptyString,
+  sections: z.array(prdSectionSchema),
+  openQuestions: z.array(nonEmptyString),
+  generatedAt: z.string().datetime()
+});

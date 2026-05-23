@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -8,8 +8,8 @@ import {
   Brain,
   CheckCircle2,
   ChevronDown,
+  Download,
   FileText,
-  Library,
   LockKeyhole,
   Loader2,
   Save,
@@ -21,42 +21,41 @@ import {
 import {
   analyzeInitiativeRequest,
   createInitiativeRequest,
+  generatePrdRequest,
   updateInitiativeRequest,
   uploadContextDocumentsRequest
 } from "@/lib/client/create-prd-api";
+import { downloadPrdMarkdown, downloadPrdPdf } from "@/lib/prd/export";
 import type {
   AnalysisFinding,
   ClarificationQuestion as ApiClarificationQuestion,
   ContextDocument,
   CreateInitiativeRequest,
   DocumentAnalysis,
+  GeneratedPrd,
   Initiative,
   InitiativeAnalysis,
-  IrrelevantContext
+  IrrelevantContext,
+  PrdSection,
+  SourceReference
 } from "@/lib/types/initiative";
 import {
   BulletInput,
-  DependencyReferences,
   GovernanceCallout,
   GuidancePanel,
   MetricEntries,
   TextAreaField,
   TextField,
-  type DependencyReference,
   type MetricEntry
 } from "./InitiativeDefinitionFields";
 import {
-  contextSources,
   initialSelectedContext,
-  outputTypes,
   workflowSteps,
   type SelectedContext
 } from "./workflow-data";
 import {
   Badge,
   ContextPill,
-  ContextSourceCard,
-  OutputTypeCard,
   SectionPanel,
   StatusMeter,
   WorkflowProgress
@@ -109,7 +108,6 @@ type InitiativeDefinitionValues = InitiativeSetupValues & {
   technicalConstraints: string[];
   governanceRequirements: string[];
   rolloutConstraints: string[];
-  relatedSystems: DependencyReference[];
 };
 
 type ClarificationAnswer = ApiClarificationQuestion & {
@@ -119,6 +117,11 @@ type ClarificationAnswer = ApiClarificationQuestion & {
 type AsyncState = {
   loading: boolean;
   success?: string;
+  error?: string;
+};
+
+type ExportState = {
+  pdfLoading: boolean;
   error?: string;
 };
 
@@ -175,43 +178,6 @@ const initialInitiativeDefinition: InitiativeDefinitionValues = {
     "staged rollout required",
     "pilot with strategic partners first",
     "rollback plan required before launch"
-  ],
-  relatedSystems: [
-    {
-      id: "billing-service",
-      name: "Billing Service",
-      relationship: "Source of billing roles, account permissions, and entitlement checks.",
-      impact: "High",
-      selected: true
-    },
-    {
-      id: "rbac-engine",
-      name: "RBAC Engine",
-      relationship: "Evaluates role inheritance and permission boundaries.",
-      impact: "High",
-      selected: true
-    },
-    {
-      id: "partner-portal",
-      name: "Partner Portal",
-      relationship: "User-facing surface for partner administrators.",
-      impact: "Medium",
-      selected: true
-    },
-    {
-      id: "auth-gateway",
-      name: "Auth Gateway",
-      relationship: "Identity and token boundary for partner sessions.",
-      impact: "Medium",
-      selected: false
-    },
-    {
-      id: "audit-pipeline",
-      name: "Audit Pipeline",
-      relationship: "Receives compliance events and governance evidence.",
-      impact: "High",
-      selected: true
-    }
   ]
 };
 
@@ -245,13 +211,7 @@ function toInitiativeRequest(
       governanceRequirements: values.governanceRequirements,
       rolloutConstraints: values.rolloutConstraints
     },
-    dependencies: values.relatedSystems
-      .filter((system) => system.selected)
-      .map((system) => ({
-        system: system.name,
-        impact: system.impact.toLowerCase() as "low" | "medium" | "high",
-        description: system.relationship
-      }))
+    dependencies: []
   };
 }
 
@@ -263,28 +223,21 @@ export function CreatePrdWorkflow() {
   const [initiative, setInitiative] = useState<Initiative | null>(null);
   const [documents, setDocuments] = useState<ContextDocument[]>([]);
   const [analysis, setAnalysis] = useState<InitiativeAnalysis | null>(null);
+  const [generatedPrd, setGeneratedPrd] = useState<GeneratedPrd | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [saveState, setSaveState] = useState<AsyncState>({ loading: false });
   const [uploadState, setUploadState] = useState<AsyncState>({ loading: false });
   const [analysisState, setAnalysisState] = useState<AsyncState>({
     loading: false
   });
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([
-    "confluence",
-    "jira",
-    "uploads",
-    "architecture"
-  ]);
+  const [generationState, setGenerationState] = useState<AsyncState>({
+    loading: false
+  });
   const [selectedContext, setSelectedContext] = useState<SelectedContext[]>(
     initialSelectedContext
   );
   const [questions, setQuestions] = useState<ClarificationAnswer[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string>("");
-  const [selectedOutputIds, setSelectedOutputIds] = useState<string[]>([
-    "enterprise-prd",
-    "engineering-tasks",
-    "rollout-checklist"
-  ]);
 
   const currentStep = workflowSteps[stepIndex];
   const answeredCount = questions.filter((question) => question.answer.trim()).length;
@@ -294,11 +247,6 @@ export function CreatePrdWorkflow() {
   const contextUsage = Math.min(
     92,
     20 + selectedContext.length * 5 + processedDocumentCount * 12
-  );
-
-  const selectedSources = useMemo(
-    () => contextSources.filter((source) => selectedSourceIds.includes(source.id)),
-    [selectedSourceIds]
   );
 
   useEffect(() => {
@@ -354,6 +302,7 @@ export function CreatePrdWorkflow() {
       setSelectedFiles([]);
       setAnalysis(null);
       setQuestions([]);
+      setGeneratedPrd(null);
       setUploadState({
         loading: false,
         success: `${uploadedDocuments.length} file${
@@ -382,6 +331,7 @@ export function CreatePrdWorkflow() {
       const nextAnalysis = await analyzeInitiativeRequest(initiative.id);
 
       setAnalysis(nextAnalysis);
+      setGeneratedPrd(null);
       setQuestions(
         nextAnalysis.clarificationQuestions.map((question) => ({
           ...question,
@@ -404,6 +354,42 @@ export function CreatePrdWorkflow() {
           error instanceof Error
             ? error.message
             : "Unable to run analysis"
+      });
+    }
+  }
+
+  async function generatePrdFromWorkflow() {
+    if (!initiative || !analysis) {
+      setGenerationState({
+        loading: false,
+        error: "Run analysis before generating a PRD."
+      });
+      return;
+    }
+
+    setGenerationState({ loading: true });
+
+    try {
+      const prd = await generatePrdRequest(
+        initiative.id,
+        questions.map((question) => ({
+          questionId: question.id,
+          answer: question.answer
+        }))
+      );
+
+      setGeneratedPrd(prd);
+      setGenerationState({
+        loading: false,
+        success: "PRD generated"
+      });
+    } catch (error) {
+      setGenerationState({
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to generate PRD"
       });
     }
   }
@@ -433,17 +419,19 @@ export function CreatePrdWorkflow() {
       return;
     }
 
+    if (currentStep.id === "clarify" && !analysis) {
+      setAnalysisState({
+        loading: false,
+        error: "Run analysis before moving to output generation."
+      });
+      return;
+    }
+
     setStepIndex((index) => Math.min(index + 1, workflowSteps.length - 1));
   }
 
   function previousStep() {
     setStepIndex((index) => Math.max(index - 1, 0));
-  }
-
-  function toggleSource(id: string) {
-    setSelectedSourceIds((ids) =>
-      ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]
-    );
   }
 
   function removeContext(id: string) {
@@ -453,12 +441,6 @@ export function CreatePrdWorkflow() {
   function updateAnswer(id: string, answer: string) {
     setQuestions((items) =>
       items.map((item) => (String(item.id) === id ? { ...item, answer } : item))
-    );
-  }
-
-  function toggleOutput(id: string) {
-    setSelectedOutputIds((ids) =>
-      ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]
     );
   }
 
@@ -518,13 +500,11 @@ export function CreatePrdWorkflow() {
         {currentStep.id === "sources" ? (
           <ContextSources
             initiative={initiative}
-            selectedSourceIds={selectedSourceIds}
             selectedContext={selectedContext}
             documents={documents}
             selectedFiles={selectedFiles}
             uploadState={uploadState}
             contextUsage={contextUsage}
-            onToggleSource={toggleSource}
             onRemoveContext={removeContext}
             onFilesChange={setSelectedFiles}
             onUpload={uploadDocuments}
@@ -548,12 +528,13 @@ export function CreatePrdWorkflow() {
         ) : null}
         {currentStep.id === "generate" ? (
           <GenerateOutputs
-            selectedSourcesCount={selectedSources.length}
             processedDocumentCount={processedDocumentCount}
             answeredCount={answeredCount}
             totalQuestions={questions.length}
-            selectedOutputIds={selectedOutputIds}
-            onToggleOutput={toggleOutput}
+            canGenerate={Boolean(initiative && analysis)}
+            generatedPrd={generatedPrd}
+            generationState={generationState}
+            onGeneratePrd={generatePrdFromWorkflow}
           />
         ) : null}
       </div>
@@ -586,7 +567,12 @@ export function CreatePrdWorkflow() {
             <button
               type="button"
               onClick={nextStep}
-              disabled={saveState.loading || uploadState.loading || analysisState.loading}
+              disabled={
+                saveState.loading ||
+                uploadState.loading ||
+                analysisState.loading ||
+                generationState.loading
+              }
               className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
             >
               Next
@@ -599,7 +585,7 @@ export function CreatePrdWorkflow() {
               className="inline-flex h-11 cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-md border border-zinc-700 bg-zinc-900/50 px-5 text-sm font-medium text-zinc-500"
             >
               <Sparkles className="h-4 w-4" strokeWidth={1.9} />
-              Generation Coming Later
+              PRD Workflow
             </button>
           )}
         </div>
@@ -654,15 +640,6 @@ function InitiativeSetup({
     onFieldChange(
       id,
       values[id].filter((item) => item !== value)
-    );
-  }
-
-  function toggleSystem(id: string) {
-    onFieldChange(
-      "relatedSystems",
-      values.relatedSystems.map((system) =>
-        system.id === id ? { ...system, selected: !system.selected } : system
-      )
     );
   }
 
@@ -830,21 +807,11 @@ function InitiativeSetup({
         </div>
       </SectionPanel>
 
-      <SectionPanel
-        title="Related systems and dependencies"
-        description="Identify the operational surface area so future analysis can reason about architecture impact."
-      >
-        <DependencyReferences
-          systems={values.relatedSystems}
-          onToggle={toggleSystem}
-        />
-      </SectionPanel>
-
       <GuidancePanel icon={Brain} title="AI readiness guidance">
-        Structured initiative definitions improve requirement analysis,
-        dependency detection, and context relevance scoring. More explicit
-        scope, constraints, and success criteria help ContextPRD rank enterprise
-        context more accurately before generation.
+        Structured initiative definitions improve requirement analysis and
+        context relevance scoring. More explicit scope, constraints, and success
+        criteria help ContextPRD rank enterprise context more accurately before
+        generation.
       </GuidancePanel>
     </div>
   );
@@ -1021,13 +988,6 @@ function AnalysisFindingGroup({
                   Recommendation: {finding.recommendation}
                 </p>
               ) : null}
-              {finding.relatedSystems?.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {finding.relatedSystems.map((system) => (
-                    <Badge key={system}>{system}</Badge>
-                  ))}
-                </div>
-              ) : null}
             </article>
           ))
         ) : (
@@ -1067,27 +1027,187 @@ function SeverityBadge({ severity }: { severity: "low" | "medium" | "high" }) {
   );
 }
 
+function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
+  const [exportState, setExportState] = useState<ExportState>({
+    pdfLoading: false
+  });
+
+  function downloadMarkdown() {
+    setExportState({ pdfLoading: false });
+    downloadPrdMarkdown(prd);
+  }
+
+  async function downloadPdf() {
+    setExportState({ pdfLoading: true });
+
+    try {
+      await downloadPrdPdf(prd);
+      setExportState({ pdfLoading: false });
+    } catch (error) {
+      setExportState({
+        pdfLoading: false,
+        error:
+          error instanceof Error ? error.message : "Unable to export PDF"
+      });
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-line bg-[#0f0f12]">
+      <div className="flex flex-col gap-4 border-b border-white/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">
+            Generated PRD
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-zinc-50">
+            {prd.title}
+          </h2>
+          <p className="mt-2 text-xs text-zinc-500">
+            Generated {new Date(prd.generatedAt).toLocaleString()}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={downloadMarkdown}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/50 px-3 text-xs font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-white"
+          >
+            <Download className="h-3.5 w-3.5" strokeWidth={1.8} />
+            Download Markdown
+          </button>
+          <button
+            type="button"
+            onClick={downloadPdf}
+            disabled={exportState.pdfLoading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/50 px-3 text-xs font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {exportState.pdfLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.8} />
+            ) : (
+              <Download className="h-3.5 w-3.5" strokeWidth={1.8} />
+            )}
+            Download PDF
+          </button>
+        </div>
+      </div>
+      {exportState.error ? (
+        <div className="border-b border-red-400/20 bg-red-400/10 px-6 py-3 text-sm leading-6 text-red-200">
+          {exportState.error}
+        </div>
+      ) : null}
+      <div className="px-6 py-6">
+        <p className="max-w-3xl text-base leading-7 text-zinc-300">
+          {prd.summary}
+        </p>
+        <div className="mt-8 divide-y divide-white/10">
+          {prd.sections.map((section) => (
+            <PrdDocumentSection key={section.id} section={section} />
+          ))}
+        </div>
+        <div className="mt-8 border-t border-white/10 pt-6">
+          <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-50">
+            Open Questions
+          </h3>
+          {prd.openQuestions.length > 0 ? (
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-zinc-400">
+              {prd.openQuestions.map((question) => (
+                <li key={question} className="pl-3">
+                  <span className="mr-2 text-amber-300">-</span>
+                  {question}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-zinc-500">
+              No open questions returned.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PrdDocumentSection({ section }: { section: PrdSection }) {
+  return (
+    <section className="py-6 first:pt-0 last:pb-0">
+      <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-50">
+        {section.title}
+      </h3>
+      <p className="mt-3 whitespace-pre-line text-sm leading-7 text-zinc-300">
+        {section.content}
+      </p>
+      <details className="mt-4">
+        <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.14em] text-zinc-600 transition hover:text-zinc-400">
+          Source references
+        </summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {section.sourceReferences.length > 0 ? (
+            section.sourceReferences.map((reference) => (
+              <SourceReferenceBadge
+                key={`${section.id}-${reference.label}-${reference.documentId ?? ""}-${reference.clarificationQuestionId ?? ""}`}
+                reference={reference}
+              />
+            ))
+          ) : (
+            <Badge>No source references</Badge>
+          )}
+        </div>
+      </details>
+    </section>
+  );
+}
+
+function SourceReferenceBadge({ reference }: { reference: SourceReference }) {
+  const label = normalizeSourceReferenceLabel(reference);
+  const detail = reference.documentId
+    ? `Document #${reference.documentId}`
+    : reference.clarificationQuestionId
+      ? `Clarification #${reference.clarificationQuestionId}`
+      : "Initiative";
+
+  return (
+    <Badge icon={FileText}>
+      {label} · {detail}
+    </Badge>
+  );
+}
+
+function normalizeSourceReferenceLabel(reference: SourceReference): string {
+  if (/^(Initiative Definition|Document:|Clarification Answer:|Analysis Finding:)/i.test(reference.label)) {
+    return reference.label;
+  }
+
+  if (reference.documentId || reference.filename) {
+    return `Document: ${reference.filename ?? reference.label}`;
+  }
+
+  if (reference.clarificationQuestionId) {
+    return `Clarification Answer: ${reference.label}`;
+  }
+
+  return reference.label.toLowerCase() === "initiative definition"
+    ? "Initiative Definition"
+    : reference.label;
+}
+
 function ContextSources({
   initiative,
-  selectedSourceIds,
   selectedContext,
   documents,
   selectedFiles,
   uploadState,
   contextUsage,
-  onToggleSource,
   onRemoveContext,
   onFilesChange,
   onUpload
 }: {
   initiative: Initiative | null;
-  selectedSourceIds: string[];
   selectedContext: SelectedContext[];
   documents: ContextDocument[];
   selectedFiles: File[];
   uploadState: AsyncState;
   contextUsage: number;
-  onToggleSource: (id: string) => void;
   onRemoveContext: (id: string) => void;
   onFilesChange: (files: File[]) => void;
   onUpload: () => void;
@@ -1102,25 +1222,24 @@ function ContextSources({
         <WorkflowNotice state={uploadState} />
 
         <SectionPanel
-          title="Connected sources"
-          description="Select the systems and document sets that should be available for AI-assisted requirement analysis."
+          title="Context Sources"
+          description="Upload the source material that should ground analysis and PRD generation."
         >
-          <div className="grid gap-3 md:grid-cols-2">
-            {contextSources.map((source) => (
-              <ContextSourceCard
-                key={source.id}
-                source={source}
-                selected={selectedSourceIds.includes(source.id)}
-                onToggle={() => onToggleSource(source.id)}
-              />
-            ))}
+          <div className="mb-4 rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <UploadCloud className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" strokeWidth={1.8} />
+              <div>
+                <p className="text-sm font-semibold text-zinc-100">
+                  Uploaded Documents
+                </p>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  This is the active v0 ingestion path. Upload RFCs, specs,
+                  architecture notes, compliance reviews, or meeting notes to
+                  ground the analysis.
+                </p>
+              </div>
+            </div>
           </div>
-        </SectionPanel>
-
-        <SectionPanel
-          title="Manual context upload"
-          description="Upload text-bearing documents for this initiative. Connectors stay mocked for v0; uploaded files drive backend analysis."
-        >
           <div className="rounded-lg border border-dashed border-zinc-700 bg-[#09090b] p-4">
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-md px-4 py-6 text-center transition hover:bg-zinc-900/70">
               <UploadCloud className="h-8 w-8 text-blue-300" strokeWidth={1.8} />
@@ -1187,6 +1306,22 @@ function ContextSources({
               ) : null}
             </div>
           ) : null}
+        </SectionPanel>
+
+        <SectionPanel
+          title="Future integrations"
+          description="Not connected in this prototype. These are examples of where uploaded context could come from later."
+        >
+          <div className="flex flex-wrap gap-2">
+            {["Confluence", "Jira", "Google Drive"].map((source) => (
+              <span
+                key={source}
+                className="rounded-md border border-line bg-[#101014] px-2.5 py-1 text-xs font-medium text-zinc-500"
+              >
+                {source}
+              </span>
+            ))}
+          </div>
         </SectionPanel>
 
         <SectionPanel title="Governance notice">
@@ -1313,7 +1448,7 @@ function AiAnalysis({
             </SectionPanel>
 
             <SectionPanel
-              title="Gaps, risks, and dependencies"
+              title="Gaps and risks"
               description="Implementation readiness issues inferred from the initiative and context."
             >
               <AnalysisFindingGroup
@@ -1323,10 +1458,6 @@ function AiAnalysis({
               <AnalysisFindingGroup
                 title="Detected risks"
                 findings={analysis.detectedRisks}
-              />
-              <AnalysisFindingGroup
-                title="Inferred dependencies"
-                findings={analysis.inferredDependencies}
               />
             </SectionPanel>
           </div>
@@ -1369,7 +1500,7 @@ function AiAnalysis({
         </div>
       ) : canAnalyze ? (
         <SectionPanel title="Analysis results">
-          <EmptyState message="Run analysis to populate document relevance, risks, gaps, dependencies, and clarification questions." />
+          <EmptyState message="Run analysis to populate document relevance, risks, gaps, and clarification questions." />
         </SectionPanel>
       ) : null}
     </div>
@@ -1463,23 +1594,16 @@ function ClarificationWorkflow({
 
                   <details className="mt-3 rounded-lg border border-line bg-surface p-3">
                     <summary className="cursor-pointer text-sm font-medium text-zinc-300">
-                      Related systems
+                      Referenced context
                     </summary>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {question.relatedSystems?.length ? (
-                        question.relatedSystems.map((system) => (
-                          <Badge key={system}>
-                            {system}
-                          </Badge>
-                        ))
-                      ) : (
-                        <Badge>No related systems supplied</Badge>
-                      )}
                       {question.documentId ? (
                         <Badge icon={FileText}>
                           Source document #{question.documentId}
                         </Badge>
-                      ) : null}
+                      ) : (
+                        <Badge>Initiative definition</Badge>
+                      )}
                     </div>
                   </details>
                 </div>
@@ -1494,19 +1618,21 @@ function ClarificationWorkflow({
 }
 
 function GenerateOutputs({
-  selectedSourcesCount,
   processedDocumentCount,
   answeredCount,
   totalQuestions,
-  selectedOutputIds,
-  onToggleOutput
+  canGenerate,
+  generatedPrd,
+  generationState,
+  onGeneratePrd
 }: {
-  selectedSourcesCount: number;
   processedDocumentCount: number;
   answeredCount: number;
   totalQuestions: number;
-  selectedOutputIds: string[];
-  onToggleOutput: (id: string) => void;
+  canGenerate: boolean;
+  generatedPrd: GeneratedPrd | null;
+  generationState: AsyncState;
+  onGeneratePrd: () => void;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
@@ -1517,10 +1643,9 @@ function GenerateOutputs({
               label="Readiness score"
               value={Math.min(95, 35 + processedDocumentCount * 15 + answeredCount * 10)}
               tone={totalQuestions > 0 && answeredCount === totalQuestions ? "green" : "amber"}
-              helper="PRD generation is intentionally disabled in v0 while analysis and clarification workflows are validated."
+              helper="Readiness reflects processed context, analysis signals, and clarification coverage before PRD generation."
             />
             <div className="grid gap-2">
-              <Badge icon={Library}>{selectedSourcesCount} context sources used</Badge>
               <Badge icon={FileText}>
                 {processedDocumentCount} processed document{processedDocumentCount === 1 ? "" : "s"}
               </Badge>
@@ -1528,30 +1653,57 @@ function GenerateOutputs({
                 {answeredCount}/{totalQuestions} clarifications complete
               </Badge>
               <Badge icon={Shield}>Governance checks available in analysis</Badge>
-              <Badge icon={AlertTriangle}>Output generation coming later</Badge>
+              <Badge icon={AlertTriangle}>
+                {generatedPrd ? "PRD generated" : "PRD generation ready"}
+              </Badge>
             </div>
           </div>
         </SectionPanel>
+
+        <SectionPanel title="Generate PRD">
+          <WorkflowNotice state={generationState} />
+          <p className="mt-3 text-sm leading-6 text-zinc-500">
+            Generate a structured PRD from the saved initiative, uploaded context,
+            analysis findings, and local clarification answers.
+          </p>
+          <button
+            type="button"
+            onClick={onGeneratePrd}
+            disabled={!canGenerate || generationState.loading}
+            className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {generationState.loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />
+            ) : (
+              <Sparkles className="h-4 w-4" strokeWidth={1.8} />
+            )}
+            Generate PRD
+          </button>
+          {!canGenerate ? (
+            <p className="mt-3 text-xs leading-5 text-amber-300">
+              Run analysis before generating a PRD.
+            </p>
+          ) : null}
+        </SectionPanel>
       </div>
 
-      <SectionPanel
-        title="Output types"
-        description="These artifacts are planned for the next backend slice. They are shown here for workflow continuity only."
-      >
-        <div className="mb-4 rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100">
-          PRD and artifact generation is not implemented in v0.
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {outputTypes.map((output) => (
-            <OutputTypeCard
-              key={output.id}
-              output={output}
-              selected={selectedOutputIds.includes(output.id)}
-              onToggle={() => onToggleOutput(output.id)}
-            />
-          ))}
-        </div>
-      </SectionPanel>
+      <div className="space-y-5">
+        <SectionPanel
+          title="Generated PRD"
+          description="Review, refine, and export the generated engineering requirements document."
+        >
+          {generatedPrd ? (
+            <p className="text-sm leading-6 text-zinc-500">
+              The generated artifact appears below as a cohesive PRD with
+              lightweight source traceability.
+            </p>
+          ) : (
+            <EmptyState message="Generate a PRD to view the document, source references, open questions, and export actions here." />
+          )}
+        </SectionPanel>
+
+        {generatedPrd ? <GeneratedPrdPreview prd={generatedPrd} /> : null}
+      </div>
     </div>
   );
 }
