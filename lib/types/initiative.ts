@@ -33,7 +33,7 @@ export type InitiativeDependency = {
 };
 
 export type Initiative = {
-  id: number;
+  id: string;
   initiativeName: string;
   executiveSummary: string;
   metadata: InitiativeMetadata;
@@ -48,13 +48,15 @@ export type CreateInitiativeRequest = Omit<Initiative, "id">;
 export type UpdateInitiativeRequest = Partial<Omit<Initiative, "id">>;
 
 export type ContextDocument = {
-  id: number;
-  initiativeId: number;
+  id: string;
+  initiativeId: string;
   filename: string;
   mimeType: string;
   uploadedAt: string;
   extractedText?: string;
   processingStatus: "uploaded" | "processing" | "processed" | "failed";
+  fileSize?: number;
+  extractionError?: string;
 };
 
 export type UploadContextResponse = {
@@ -62,7 +64,7 @@ export type UploadContextResponse = {
 };
 
 export type InitiativeAnalysis = {
-  initiativeId: number;
+  initiativeId: string;
   documentAnalysis: DocumentAnalysis[];
   irrelevantContext: IrrelevantContext[];
   detectedGaps: AnalysisFinding[];
@@ -73,7 +75,7 @@ export type InitiativeAnalysis = {
 };
 
 export type DocumentAnalysis = {
-  documentId: number;
+  documentId: string;
   filename: string;
   relevancyScore: number;
   summary: string;
@@ -83,7 +85,7 @@ export type DocumentAnalysis = {
 };
 
 export type IrrelevantContext = {
-  documentId: number;
+  documentId: string;
   filename: string;
   reason: string;
   irrelevantTopics: string[];
@@ -94,14 +96,14 @@ export type AnalysisFinding = {
   description: string;
   severity: "low" | "medium" | "high";
   category: "risk" | "gap" | "dependency" | "governance" | "rollout" | "technical";
-  relatedDocuments?: number[];
+  relatedDocuments?: string[];
   relatedSystems?: string[];
   recommendation?: string;
 };
 
 export type ClarificationQuestion = {
-  id: number;
-  documentId?: number;
+  id: string;
+  documentId?: string;
   question: string;
   rationale: string;
   category: "business" | "technical" | "scope" | "governance" | "dependency" | "rollout";
@@ -110,7 +112,7 @@ export type ClarificationQuestion = {
 };
 
 export type ClarificationAnswer = {
-  questionId: number;
+  questionId: string;
   answer: string;
 };
 
@@ -130,12 +132,20 @@ export type RefinePrdSectionResponse = {
 };
 
 export type GeneratedPrd = {
-  initiativeId: number;
+  initiativeId: string;
   title: string;
   summary: string;
   sections: PrdSection[];
   openQuestions: string[];
   generatedAt: string;
+};
+
+export type WorkflowStateResponse = {
+  initiative: Initiative;
+  documents: ContextDocument[];
+  analysis?: InitiativeAnalysis;
+  clarificationAnswers: ClarificationAnswer[];
+  generatedPrd?: GeneratedPrd;
 };
 
 export type PrdSection = {
@@ -146,8 +156,8 @@ export type PrdSection = {
 };
 
 export type SourceReference = {
-  documentId?: number;
+  documentId?: string;
   filename?: string;
-  clarificationQuestionId?: number;
+  clarificationQuestionId?: string;
   label: string;
 };

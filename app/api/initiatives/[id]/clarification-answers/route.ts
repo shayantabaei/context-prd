@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireUserId } from "@/lib/auth/server-user";
-import { generatePrd } from "@/lib/services/prd-generation";
+import {
+  getInitiative,
+  upsertClarificationAnswers
+} from "@/lib/services/initiative-store";
 import { jsonError, parseId, parseJsonRequest, toApiError } from "@/lib/validation/api";
 import { generatePrdRequestSchema } from "@/lib/validation/initiative";
 
@@ -26,9 +29,19 @@ export async function POST(request: Request, context: RouteContext) {
       await request.json()
     );
     const userId = await requireUserId();
-    const prd = await generatePrd(userId, id, payload.clarificationAnswers);
+    const initiative = await getInitiative(userId, id);
 
-    return NextResponse.json(prd);
+    if (!initiative) {
+      return jsonError("Initiative not found", 404);
+    }
+
+    await upsertClarificationAnswers(
+      userId,
+      id,
+      payload.clarificationAnswers
+    );
+
+    return NextResponse.json({ clarificationAnswers: payload.clarificationAnswers });
   } catch (error) {
     return toApiError(error);
   }

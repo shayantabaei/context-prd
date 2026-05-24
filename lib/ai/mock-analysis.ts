@@ -98,7 +98,7 @@ export function createMockInitiativeAnalysis(
     })),
     clarificationQuestions: [
       {
-        id: 1,
+        id: "1",
         documentId: firstDocument?.id,
         question:
           "Which specific permission changes must emit audit events, and what fields must each event include for compliance review?",
@@ -109,7 +109,7 @@ export function createMockInitiativeAnalysis(
         relatedSystems
       },
       {
-        id: 2,
+        id: "2",
         question:
           "Should existing users inherit new permissions automatically, or should access be granted only through explicit admin action?",
         rationale:
@@ -119,7 +119,7 @@ export function createMockInitiativeAnalysis(
         relatedSystems
       },
       {
-        id: 3,
+        id: "3",
         question:
           "What conditions should block rollout from pilot partners to broader availability?",
         rationale:

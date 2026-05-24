@@ -15,7 +15,7 @@ export function CTASection() {
           SDLC expectations so your next PRD is specific from the first pass.
         </p>
         <a
-          href="/signin"
+          href="/auth/login"
           className="mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
         >
           <Sparkles className="h-4 w-4" strokeWidth={1.9} />

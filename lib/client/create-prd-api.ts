@@ -6,7 +6,8 @@ import type {
   InitiativeAnalysis,
   PrdSection,
   UpdateInitiativeRequest,
-  UploadContextResponse
+  UploadContextResponse,
+  WorkflowStateResponse
 } from "@/lib/types/initiative";
 
 async function parseApiResponse<T>(response: Response): Promise<T> {
@@ -39,7 +40,7 @@ export async function createInitiativeRequest(
 }
 
 export async function updateInitiativeRequest(
-  id: number,
+  id: string,
   payload: UpdateInitiativeRequest
 ): Promise<Initiative> {
   const response = await fetch(`/api/initiatives/${id}`, {
@@ -53,8 +54,22 @@ export async function updateInitiativeRequest(
   return parseApiResponse<Initiative>(response);
 }
 
+export async function getInitiativeRequest(id: string): Promise<Initiative> {
+  const response = await fetch(`/api/initiatives/${id}`);
+
+  return parseApiResponse<Initiative>(response);
+}
+
+export async function getWorkflowStateRequest(
+  initiativeId: string
+): Promise<WorkflowStateResponse> {
+  const response = await fetch(`/api/initiatives/${initiativeId}/workflow-state`);
+
+  return parseApiResponse<WorkflowStateResponse>(response);
+}
+
 export async function uploadContextDocumentsRequest(
-  initiativeId: number,
+  initiativeId: string,
   files: File[]
 ): Promise<ContextDocument[]> {
   const formData = new FormData();
@@ -74,7 +89,7 @@ export async function uploadContextDocumentsRequest(
 }
 
 export async function analyzeInitiativeRequest(
-  initiativeId: number
+  initiativeId: string
 ): Promise<InitiativeAnalysis> {
   const response = await fetch(`/api/initiatives/${initiativeId}/analyze`, {
     method: "POST"
@@ -84,8 +99,8 @@ export async function analyzeInitiativeRequest(
 }
 
 export async function generatePrdRequest(
-  initiativeId: number,
-  clarificationAnswers: { questionId: number; answer: string }[]
+  initiativeId: string,
+  clarificationAnswers: { questionId: string; answer: string }[]
 ): Promise<GeneratedPrd> {
   const response = await fetch(`/api/initiatives/${initiativeId}/generate-prd`, {
     method: "POST",
@@ -98,6 +113,26 @@ export async function generatePrdRequest(
   return parseApiResponse<GeneratedPrd>(response);
 }
 
+export async function saveClarificationAnswersRequest(
+  initiativeId: string,
+  clarificationAnswers: { questionId: string; answer: string }[]
+): Promise<{ clarificationAnswers: { questionId: string; answer: string }[] }> {
+  const response = await fetch(
+    `/api/initiatives/${initiativeId}/clarification-answers`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ clarificationAnswers })
+    }
+  );
+
+  return parseApiResponse<{
+    clarificationAnswers: { questionId: string; answer: string }[];
+  }>(response);
+}
+
 export async function refinePrdSectionRequest({
   initiativeId,
   prd,
@@ -105,11 +140,11 @@ export async function refinePrdSectionRequest({
   instruction,
   clarificationAnswers
 }: {
-  initiativeId: number;
+  initiativeId: string;
   prd: GeneratedPrd;
   sectionId: string;
   instruction: string;
-  clarificationAnswers: { questionId: number; answer: string }[];
+  clarificationAnswers: { questionId: string; answer: string }[];
 }): Promise<PrdSection> {
   const response = await fetch(
     `/api/initiatives/${initiativeId}/refine-prd-section`,

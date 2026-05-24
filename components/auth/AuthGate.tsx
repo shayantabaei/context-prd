@@ -2,69 +2,41 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getMockSession, type MockAuthState } from "@/lib/mock-session";
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
 type AuthGateProps = {
   children: React.ReactNode;
-  requireWorkspace?: boolean;
-  onboardingOnly?: boolean;
 };
 
-export function AuthGate({
-  children,
-  requireWorkspace = false,
-  onboardingOnly = false
-}: AuthGateProps) {
+export function AuthGate({ children }: AuthGateProps) {
   const router = useRouter();
-  const [state, setState] = useState<MockAuthState | null>(null);
+  const [user, setUser] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
-    const session = getMockSession();
-    setState(session.state);
+    const supabase = createClient();
 
-    if (session.state === "unauthenticated") {
-      router.replace("/signin");
-      return;
-    }
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
 
-    if (requireWorkspace && session.state !== "authenticated_with_workspace") {
-      router.replace("/onboarding/workspace");
-      return;
-    }
+      if (!data.user) {
+        router.replace("/auth/login");
+      }
+    });
+  }, [router]);
 
-    if (onboardingOnly && session.state === "authenticated_with_workspace") {
-      router.replace("/app");
-    }
-  }, [onboardingOnly, requireWorkspace, router]);
-
-  if (state === null) {
+  if (user === undefined) {
     return (
       <main className="grid min-h-screen place-items-center bg-canvas text-sm text-zinc-500">
-        Loading workspace...
+        Loading secure session...
       </main>
     );
   }
 
-  if (state === "unauthenticated") {
+  if (!user) {
     return (
       <main className="grid min-h-screen place-items-center bg-canvas text-sm text-zinc-500">
-        Redirecting to sign in...
-      </main>
-    );
-  }
-
-  if (requireWorkspace && state !== "authenticated_with_workspace") {
-    return (
-      <main className="grid min-h-screen place-items-center bg-canvas text-sm text-zinc-500">
-        Redirecting to workspace setup...
-      </main>
-    );
-  }
-
-  if (onboardingOnly && state === "authenticated_with_workspace") {
-    return (
-      <main className="grid min-h-screen place-items-center bg-canvas text-sm text-zinc-500">
-        Opening workspace...
+        Redirecting to login...
       </main>
     );
   }

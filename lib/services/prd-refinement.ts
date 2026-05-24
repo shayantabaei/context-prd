@@ -9,37 +9,42 @@ import {
   getInitiative,
   getLatestGeneratedPrd,
   getLatestInitiativeAnalysis,
-  saveGeneratedPrd
+  updateLatestGeneratedPrdSection,
+  upsertClarificationAnswers
 } from "./initiative-store";
 
 export async function refinePrdSection({
+  userId,
   initiativeId,
   prd,
   sectionId,
   instruction,
   clarificationAnswers = []
 }: {
-  initiativeId: number;
+  userId: string;
+  initiativeId: string;
   prd: GeneratedPrd;
   sectionId: string;
   instruction: string;
   clarificationAnswers?: ClarificationAnswer[];
 }): Promise<PrdSection> {
-  const initiative = getInitiative(initiativeId);
+  await upsertClarificationAnswers(userId, initiativeId, clarificationAnswers);
+
+  const initiative = await getInitiative(userId, initiativeId);
 
   if (!initiative) {
     throw new Error("INITIATIVE_NOT_FOUND");
   }
 
-  const persistedPrd = getLatestGeneratedPrd(initiativeId) ?? prd;
+  const persistedPrd = (await getLatestGeneratedPrd(userId, initiativeId)) ?? prd;
   const section = persistedPrd.sections.find((item) => item.id === sectionId);
 
   if (!section) {
     throw new Error("PRD_SECTION_NOT_FOUND");
   }
 
-  const documents = getDocumentsForInitiative(initiativeId);
-  const analysis = getLatestInitiativeAnalysis(initiativeId);
+  const documents = await getDocumentsForInitiative(userId, initiativeId);
+  const analysis = await getLatestInitiativeAnalysis(userId, initiativeId);
 
   const refinedSection = await refinePrdSectionWithAi({
     initiative,
@@ -50,14 +55,12 @@ export async function refinePrdSection({
     instruction,
     clarificationAnswers
   });
-  const updatedPrd: GeneratedPrd = {
-    ...persistedPrd,
-    sections: persistedPrd.sections.map((item) =>
-      item.id === refinedSection.id ? refinedSection : item
-    )
-  };
 
-  saveGeneratedPrd(updatedPrd);
+  await updateLatestGeneratedPrdSection({
+    userId,
+    initiativeId,
+    section: refinedSection
+  });
 
   return refinedSection;
 }

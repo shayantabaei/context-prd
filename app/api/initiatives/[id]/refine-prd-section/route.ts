@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUserId } from "@/lib/auth/server-user";
 import { refinePrdSection } from "@/lib/services/prd-refinement";
 import { jsonError, parseId, parseJsonRequest, toApiError } from "@/lib/validation/api";
 import {
@@ -27,7 +28,9 @@ export async function POST(request: Request, context: RouteContext) {
       refinePrdSectionRequestSchema,
       await request.json()
     );
+    const userId = await requireUserId();
     const section = await refinePrdSection({
+      userId,
       initiativeId: id,
       prd: payload.prd,
       sectionId: payload.sectionId,
