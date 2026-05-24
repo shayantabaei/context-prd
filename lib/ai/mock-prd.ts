@@ -169,3 +169,45 @@ export function createMockGeneratedPrd({
     generatedAt: new Date().toISOString()
   };
 }
+
+export function createMockRefinedPrdSection({
+  section,
+  instruction,
+  clarificationAnswers
+}: {
+  section: PrdSection;
+  instruction: string;
+  clarificationAnswers: ClarificationAnswer[];
+}): PrdSection {
+  const answeredClarifications = clarificationAnswers.filter((answer) =>
+    answer.answer.trim()
+  );
+  const refinementReference: SourceReference = {
+    label: "Refinement Instruction"
+  };
+  const clarificationReference = answeredClarifications[0]
+    ? {
+        clarificationQuestionId: answeredClarifications[0].questionId,
+        label: `Clarification Answer: Question #${answeredClarifications[0].questionId}`
+      }
+    : undefined;
+
+  return {
+    ...section,
+    content: [
+      section.content,
+      "",
+      "Refinement applied:",
+      `- ${instruction}`,
+      "- Tightened this section to keep the PRD implementation-oriented and explicit about delivery implications.",
+      clarificationReference
+        ? `- Incorporated available clarification context from question #${clarificationReference.clarificationQuestionId}.`
+        : "- No additional clarification answer was available for this refinement."
+    ].join("\n"),
+    sourceReferences: [
+      ...section.sourceReferences,
+      refinementReference,
+      ...(clarificationReference ? [clarificationReference] : [])
+    ]
+  };
+}

@@ -121,6 +121,12 @@ export function saveGeneratedPrd(prd: GeneratedPrd): GeneratedPrd {
   return prd;
 }
 
+export function getLatestGeneratedPrd(
+  initiativeId: number
+): GeneratedPrd | undefined {
+  return store.generatedPrds.find((prd) => prd.initiativeId === initiativeId);
+}
+
 export function clearStoreForTests() {
   store.nextInitiativeId = 1;
   store.nextDocumentId = 1;

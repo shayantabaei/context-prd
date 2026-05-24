@@ -12,6 +12,7 @@ import {
   FileText,
   LockKeyhole,
   Loader2,
+  PencilLine,
   Save,
   Shield,
   Sparkles,
@@ -22,6 +23,7 @@ import {
   analyzeInitiativeRequest,
   createInitiativeRequest,
   generatePrdRequest,
+  refinePrdSectionRequest,
   updateInitiativeRequest,
   uploadContextDocumentsRequest
 } from "@/lib/client/create-prd-api";
@@ -394,6 +396,39 @@ export function CreatePrdWorkflow() {
     }
   }
 
+  async function refineGeneratedPrdSection(
+    sectionId: string,
+    instruction: string
+  ): Promise<PrdSection> {
+    if (!initiative || !generatedPrd) {
+      throw new Error("Generate a PRD before refining sections.");
+    }
+
+    const refinedSection = await refinePrdSectionRequest({
+      initiativeId: initiative.id,
+      prd: generatedPrd,
+      sectionId,
+      instruction,
+      clarificationAnswers: questions.map((question) => ({
+        questionId: question.id,
+        answer: question.answer
+      }))
+    });
+
+    setGeneratedPrd((currentPrd) =>
+      currentPrd
+        ? {
+            ...currentPrd,
+            sections: currentPrd.sections.map((section) =>
+              section.id === refinedSection.id ? refinedSection : section
+            )
+          }
+        : currentPrd
+    );
+
+    return refinedSection;
+  }
+
   async function nextStep() {
     if (currentStep.id === "setup") {
       const savedInitiative = await saveInitiative();
@@ -535,6 +570,7 @@ export function CreatePrdWorkflow() {
             generatedPrd={generatedPrd}
             generationState={generationState}
             onGeneratePrd={generatePrdFromWorkflow}
+            onRefineSection={refineGeneratedPrdSection}
           />
         ) : null}
       </div>
@@ -1027,7 +1063,13 @@ function SeverityBadge({ severity }: { severity: "low" | "medium" | "high" }) {
   );
 }
 
-function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
+function GeneratedPrdPreview({
+  prd,
+  onRefineSection
+}: {
+  prd: GeneratedPrd;
+  onRefineSection: (sectionId: string, instruction: string) => Promise<PrdSection>;
+}) {
   const [exportState, setExportState] = useState<ExportState>({
     pdfLoading: false
   });
@@ -1101,7 +1143,11 @@ function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
         </p>
         <div className="mt-8 divide-y divide-white/10">
           {prd.sections.map((section) => (
-            <PrdDocumentSection key={section.id} section={section} />
+            <PrdDocumentSection
+              key={section.id}
+              section={section}
+              onRefineSection={onRefineSection}
+            />
           ))}
         </div>
         <div className="mt-8 border-t border-white/10 pt-6">
@@ -1128,15 +1174,127 @@ function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
   );
 }
 
-function PrdDocumentSection({ section }: { section: PrdSection }) {
+function PrdDocumentSection({
+  section,
+  onRefineSection
+}: {
+  section: PrdSection;
+  onRefineSection: (sectionId: string, instruction: string) => Promise<PrdSection>;
+}) {
+  const [isRefining, setIsRefining] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [refinementState, setRefinementState] = useState<AsyncState>({
+    loading: false
+  });
+
+  async function applyRefinement() {
+    const trimmedInstruction = instruction.trim();
+
+    if (!trimmedInstruction) {
+      setRefinementState({
+        loading: false,
+        error: "Add refinement instructions before applying."
+      });
+      return;
+    }
+
+    setRefinementState({ loading: true });
+
+    try {
+      await onRefineSection(section.id, trimmedInstruction);
+      setInstruction("");
+      setIsRefining(false);
+      setRefinementState({
+        loading: false,
+        success: "Section refined"
+      });
+    } catch (error) {
+      setRefinementState({
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to refine section"
+      });
+    }
+  }
+
   return (
     <section className="py-6 first:pt-0 last:pb-0">
-      <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-50">
-        {section.title}
-      </h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-50">
+          {section.title}
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            setIsRefining((value) => !value);
+            setRefinementState({ loading: false });
+          }}
+          className="inline-flex h-8 items-center justify-center gap-2 self-start rounded-md border border-zinc-700 bg-zinc-900/40 px-2.5 text-xs font-medium text-zinc-400 transition hover:border-zinc-500 hover:text-white"
+        >
+          <PencilLine className="h-3.5 w-3.5" strokeWidth={1.8} />
+          Refine
+        </button>
+      </div>
       <p className="mt-3 whitespace-pre-line text-sm leading-7 text-zinc-300">
         {section.content}
       </p>
+      {isRefining ? (
+        <div className="mt-4 rounded-lg border border-line bg-[#101014] p-3">
+          <label
+            htmlFor={`refine-${section.id}`}
+            className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500"
+          >
+            Refinement instructions
+          </label>
+          <textarea
+            id={`refine-${section.id}`}
+            value={instruction}
+            rows={3}
+            onChange={(event) => setInstruction(event.target.value)}
+            placeholder="Tell ContextPRD how to improve this section..."
+            className="mt-2 w-full resize-none rounded-md border border-line bg-[#09090b] px-3 py-2 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-blue-500/60"
+          />
+          {refinementState.error ? (
+            <p className="mt-2 text-xs leading-5 text-red-200">
+              {refinementState.error}
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={applyRefinement}
+              disabled={refinementState.loading}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {refinementState.loading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.8} />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
+              )}
+              Apply Refinement
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInstruction("");
+                setIsRefining(false);
+                setRefinementState({ loading: false });
+              }}
+              disabled={refinementState.loading}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900/40 px-3 text-xs font-medium text-zinc-400 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {refinementState.success && !isRefining ? (
+        <p className="mt-3 text-xs leading-5 text-emerald-300">
+          {refinementState.success}
+        </p>
+      ) : null}
       <details className="mt-4">
         <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.14em] text-zinc-600 transition hover:text-zinc-400">
           Source references
@@ -1624,7 +1782,8 @@ function GenerateOutputs({
   canGenerate,
   generatedPrd,
   generationState,
-  onGeneratePrd
+  onGeneratePrd,
+  onRefineSection
 }: {
   processedDocumentCount: number;
   answeredCount: number;
@@ -1633,6 +1792,7 @@ function GenerateOutputs({
   generatedPrd: GeneratedPrd | null;
   generationState: AsyncState;
   onGeneratePrd: () => void;
+  onRefineSection: (sectionId: string, instruction: string) => Promise<PrdSection>;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
@@ -1702,7 +1862,12 @@ function GenerateOutputs({
           )}
         </SectionPanel>
 
-        {generatedPrd ? <GeneratedPrdPreview prd={generatedPrd} /> : null}
+        {generatedPrd ? (
+          <GeneratedPrdPreview
+            prd={generatedPrd}
+            onRefineSection={onRefineSection}
+          />
+        ) : null}
       </div>
     </div>
   );

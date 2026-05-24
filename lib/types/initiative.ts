@@ -118,6 +118,17 @@ export type GeneratePrdRequest = {
   clarificationAnswers: ClarificationAnswer[];
 };
 
+export type RefinePrdSectionRequest = {
+  prd: GeneratedPrd;
+  sectionId: string;
+  instruction: string;
+  clarificationAnswers?: ClarificationAnswer[];
+};
+
+export type RefinePrdSectionResponse = {
+  section: PrdSection;
+};
+
 export type GeneratedPrd = {
   initiativeId: number;
   title: string;
