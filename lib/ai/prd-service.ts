@@ -1,15 +1,19 @@
 import OpenAI from "openai";
 import { getDefaultOpenAiModel, hasOpenAiApiKey } from "@/lib/ai/model-config";
-import { createMockGeneratedPrd } from "@/lib/ai/mock-prd";
-import { buildPrdGenerationPrompt } from "@/lib/ai/prd-prompt";
+import { createMockGeneratedPrd, createMockRefinedPrdSection } from "@/lib/ai/mock-prd";
+import {
+  buildPrdGenerationPrompt,
+  buildPrdSectionRefinementPrompt
+} from "@/lib/ai/prd-prompt";
 import type {
   ClarificationAnswer,
   ContextDocument,
   GeneratedPrd,
   Initiative,
-  InitiativeAnalysis
+  InitiativeAnalysis,
+  PrdSection
 } from "@/lib/types/initiative";
-import { generatedPrdSchema } from "@/lib/validation/initiative";
+import { generatedPrdSchema, prdSectionSchema } from "@/lib/validation/initiative";
 
 const requiredPrdSections = [
   "Executive Summary",
@@ -264,4 +268,133 @@ export async function generatePrdWithAi({
   });
 
   return prd;
+}
+
+function normalizePrdSectionResponse({
+  parsedObject,
+  section,
+  instruction
+}: {
+  parsedObject: Record<string, unknown>;
+  section: PrdSection;
+  instruction: string;
+}): PrdSection {
+  const rawSection =
+    typeof parsedObject.section === "object" && parsedObject.section !== null
+      ? (parsedObject.section as Record<string, unknown>)
+      : parsedObject;
+  const allowTitleChange = /title|heading|rename/i.test(instruction);
+  const sourceReferences = normalizeSourceReferences(
+    rawSection.sourceReferences
+  );
+
+  return prdSectionSchema.parse({
+    id: section.id,
+    title:
+      allowTitleChange && typeof rawSection.title === "string"
+        ? rawSection.title
+        : section.title,
+    content: stringifyGeneratedContent(rawSection.content),
+    sourceReferences:
+      sourceReferences.length > 0
+        ? sourceReferences
+        : section.sourceReferences
+  });
+}
+
+export async function refinePrdSectionWithAi({
+  initiative,
+  documents,
+  analysis,
+  prd,
+  section,
+  instruction,
+  clarificationAnswers
+}: {
+  initiative: Initiative;
+  documents: ContextDocument[];
+  analysis?: InitiativeAnalysis;
+  prd: GeneratedPrd;
+  section: PrdSection;
+  instruction: string;
+  clarificationAnswers: ClarificationAnswer[];
+}): Promise<PrdSection> {
+  if (!hasOpenAiApiKey()) {
+    console.info("[ContextPRD refine-prd-section] using mock section fallback", {
+      reason: "OPENAI_API_KEY is not configured",
+      initiativeId: initiative.id,
+      sectionId: section.id
+    });
+
+    return prdSectionSchema.parse(
+      createMockRefinedPrdSection({
+        section,
+        instruction,
+        clarificationAnswers
+      })
+    );
+  }
+
+  const model = getDefaultOpenAiModel();
+
+  console.info("[ContextPRD refine-prd-section] calling OpenAI", {
+    initiativeId: initiative.id,
+    model,
+    sectionId: section.id,
+    documentCount: documents.length,
+    hasAnalysis: Boolean(analysis),
+    clarificationAnswerCount: clarificationAnswers.length
+  });
+
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+
+  const response = await client.chat.completions.create({
+    model,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: buildPrdSectionRefinementPrompt({
+          initiative,
+          documents,
+          analysis,
+          prd,
+          section,
+          instruction,
+          clarificationAnswers
+        })
+      }
+    ]
+  });
+
+  const content = response.choices[0]?.message.content;
+
+  if (!content) {
+    throw new Error("OpenAI returned an empty PRD section response");
+  }
+
+  const parsed = parseJsonObject(content);
+  const parsedObject =
+    typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : {};
+  const refinedSection = normalizePrdSectionResponse({
+    parsedObject,
+    section,
+    instruction
+  });
+
+  console.info("[ContextPRD refine-prd-section] section validated", {
+    initiativeId: initiative.id,
+    sectionId: refinedSection.id
+  });
+
+  return refinedSection;
 }

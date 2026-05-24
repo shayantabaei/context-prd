@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const nonEmptyString = z.string().trim().min(1);
+const idString = z.string().uuid();
 
 export const successMetricSchema = z.object({
   metric: nonEmptyString,
@@ -43,7 +44,7 @@ export const createInitiativeRequestSchema = initiativeSchema;
 export const updateInitiativeRequestSchema = initiativeSchema.partial();
 
 export const documentAnalysisSchema = z.object({
-  documentId: z.number().int().positive(),
+  documentId: idString,
   filename: nonEmptyString,
   relevancyScore: z.number().min(0).max(1),
   summary: nonEmptyString,
@@ -53,7 +54,7 @@ export const documentAnalysisSchema = z.object({
 });
 
 export const irrelevantContextSchema = z.object({
-  documentId: z.number().int().positive(),
+  documentId: idString,
   filename: nonEmptyString,
   reason: nonEmptyString,
   irrelevantTopics: z.array(nonEmptyString)
@@ -71,14 +72,14 @@ export const analysisFindingSchema = z.object({
     "rollout",
     "technical"
   ]),
-  relatedDocuments: z.array(z.number().int().positive()).optional(),
+  relatedDocuments: z.array(idString).optional(),
   relatedSystems: z.array(nonEmptyString).optional(),
   recommendation: z.string().trim().optional()
 });
 
 export const clarificationQuestionSchema = z.object({
-  id: z.number().int().positive(),
-  documentId: z.number().int().positive().optional(),
+  id: z.union([z.string(), z.number()]).transform(String),
+  documentId: idString.optional(),
   question: nonEmptyString,
   rationale: nonEmptyString,
   category: z.enum([
@@ -94,7 +95,7 @@ export const clarificationQuestionSchema = z.object({
 });
 
 export const initiativeAnalysisSchema = z.object({
-  initiativeId: z.number().int().positive(),
+  initiativeId: idString,
   documentAnalysis: z.array(documentAnalysisSchema),
   irrelevantContext: z.array(irrelevantContextSchema),
   detectedGaps: z.array(analysisFindingSchema),
@@ -105,7 +106,7 @@ export const initiativeAnalysisSchema = z.object({
 });
 
 export const clarificationAnswerSchema = z.object({
-  questionId: z.number().int().positive(),
+  questionId: z.union([z.string(), z.number()]).transform(String),
   answer: z.string().trim()
 });
 
@@ -114,9 +115,9 @@ export const generatePrdRequestSchema = z.object({
 });
 
 export const sourceReferenceSchema = z.object({
-  documentId: z.number().int().positive().optional(),
+  documentId: idString.optional(),
   filename: z.string().trim().optional(),
-  clarificationQuestionId: z.number().int().positive().optional(),
+  clarificationQuestionId: z.union([z.string(), z.number()]).transform(String).optional(),
   label: nonEmptyString
 });
 
@@ -128,10 +129,21 @@ export const prdSectionSchema = z.object({
 });
 
 export const generatedPrdSchema = z.object({
-  initiativeId: z.number().int().positive(),
+  initiativeId: idString,
   title: nonEmptyString,
   summary: nonEmptyString,
   sections: z.array(prdSectionSchema),
   openQuestions: z.array(nonEmptyString),
   generatedAt: z.string().datetime()
+});
+
+export const refinePrdSectionRequestSchema = z.object({
+  prd: generatedPrdSchema,
+  sectionId: nonEmptyString,
+  instruction: nonEmptyString,
+  clarificationAnswers: z.array(clarificationAnswerSchema).optional()
+});
+
+export const refinePrdSectionResponseSchema = z.object({
+  section: prdSectionSchema
 });

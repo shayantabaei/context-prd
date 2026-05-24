@@ -24,7 +24,7 @@ const standards = [
 
 export default function TemplatesPage() {
   return (
-    <AuthGate onboardingOnly>
+    <AuthGate>
       <OnboardingShell
         currentStep={2}
         eyebrow="Standards and templates"

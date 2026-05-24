@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUserId } from "@/lib/auth/server-user";
 import { generatePrd } from "@/lib/services/prd-generation";
 import { jsonError, parseId, parseJsonRequest, toApiError } from "@/lib/validation/api";
 import { generatePrdRequestSchema } from "@/lib/validation/initiative";
@@ -24,7 +25,8 @@ export async function POST(request: Request, context: RouteContext) {
       generatePrdRequestSchema,
       await request.json()
     );
-    const prd = await generatePrd(id, payload.clarificationAnswers);
+    const userId = await requireUserId();
+    const prd = await generatePrd(userId, id, payload.clarificationAnswers);
 
     return NextResponse.json(prd);
   } catch (error) {

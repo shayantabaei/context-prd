@@ -7,17 +7,18 @@ import {
 } from "./initiative-store";
 
 export async function analyzeInitiative(
-  initiativeId: number
+  userId: string,
+  initiativeId: string
 ): Promise<InitiativeAnalysis> {
-  const initiative = getInitiative(initiativeId);
+  const initiative = await getInitiative(userId, initiativeId);
 
   if (!initiative) {
     throw new Error("INITIATIVE_NOT_FOUND");
   }
 
-  const documents = getDocumentsForInitiative(initiativeId);
+  const documents = await getDocumentsForInitiative(userId, initiativeId);
 
   const analysis = await analyzeInitiativeWithAi(initiative, documents);
 
-  return saveInitiativeAnalysis(analysis);
+  return saveInitiativeAnalysis(userId, analysis);
 }

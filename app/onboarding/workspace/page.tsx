@@ -17,7 +17,7 @@ const workspaceFields = [
 
 export default function WorkspaceSetupPage() {
   return (
-    <AuthGate onboardingOnly>
+    <AuthGate>
       <OnboardingShell
         currentStep={0}
         eyebrow="Workspace setup"

@@ -1,8 +1,10 @@
 import type {
   ClarificationAnswer,
   ContextDocument,
+  GeneratedPrd,
   Initiative,
-  InitiativeAnalysis
+  InitiativeAnalysis,
+  PrdSection
 } from "@/lib/types/initiative";
 
 const maxDocumentCharacters = 5_000;
@@ -131,5 +133,87 @@ export function buildPrdGenerationPrompt({
     "",
     "Clarification answers:",
     JSON.stringify(clarificationAnswers, null, 2)
+  ].join("\n");
+}
+
+export function buildPrdSectionRefinementPrompt({
+  initiative,
+  documents,
+  analysis,
+  prd,
+  section,
+  instruction,
+  clarificationAnswers
+}: {
+  initiative: Initiative;
+  documents: ContextDocument[];
+  analysis?: InitiativeAnalysis;
+  prd: GeneratedPrd;
+  section: PrdSection;
+  instruction: string;
+  clarificationAnswers: ClarificationAnswer[];
+}) {
+  const documentPayload = documents.map((document) => ({
+    id: document.id,
+    filename: document.filename,
+    processingStatus: document.processingStatus,
+    extractedText:
+      document.extractedText?.slice(0, maxDocumentCharacters) ||
+      "[No extracted text available]"
+  }));
+
+  return [
+    "You are ContextPRD, an enterprise PRD refinement system.",
+    "Refine exactly one PRD section and return strict JSON only.",
+    "Do not regenerate the full PRD.",
+    "Do not output markdown outside the JSON object.",
+    "",
+    "Refinement rules:",
+    "- Use the original section as the base.",
+    "- Use the full PRD only for surrounding context and consistency.",
+    "- Use the initiative definition as the source of product intent.",
+    "- Use uploaded documents, analysis findings, and clarification answers as grounding evidence.",
+    "- Follow the user's refinement instruction directly.",
+    "- Keep content implementation-oriented and suitable for an engineering PRD/RFC.",
+    "- Preserve important constraints, risks, and unresolved gaps.",
+    "- Do not invent unsupported facts. If a detail is missing, state the uncertainty clearly.",
+    "- Preserve the section title unless the instruction explicitly asks to change the title or heading.",
+    "- Preserve sourceReferences unless better references are clearly supported by the provided context.",
+    "- Return only the updated section.",
+    "",
+    "Return only JSON matching this shape:",
+    JSON.stringify(
+      {
+        section: {
+          id: section.id,
+          title: section.title,
+          content: "string",
+          sourceReferences: section.sourceReferences
+        }
+      },
+      null,
+      2
+    ),
+    "",
+    "User refinement instruction:",
+    instruction,
+    "",
+    "Initiative definition:",
+    JSON.stringify(initiative, null, 2),
+    "",
+    "Uploaded context documents:",
+    JSON.stringify(documentPayload, null, 2),
+    "",
+    "Latest initiative analysis:",
+    JSON.stringify(analysis ?? null, null, 2),
+    "",
+    "Clarification answers:",
+    JSON.stringify(clarificationAnswers, null, 2),
+    "",
+    "Full generated PRD:",
+    JSON.stringify(prd, null, 2),
+    "",
+    "Section to refine:",
+    JSON.stringify(section, null, 2)
   ].join("\n");
 }

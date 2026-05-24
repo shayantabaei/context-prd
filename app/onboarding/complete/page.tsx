@@ -5,18 +5,16 @@ import { ArrowRight, CheckCircle2, FileText, LayoutDashboard } from "lucide-reac
 import { AuthGate } from "@/components/auth/AuthGate";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { onboardingSteps } from "@/components/onboarding/onboarding-steps";
-import { completeMockWorkspace } from "@/lib/mock-session";
 
 export default function OnboardingCompletePage() {
   const router = useRouter();
 
   function routeTo(path: string) {
-    completeMockWorkspace();
     router.push(path);
   }
 
   return (
-    <AuthGate onboardingOnly>
+    <AuthGate>
       <OnboardingShell
         currentStep={3}
         eyebrow="Workspace ready"
@@ -32,8 +30,8 @@ export default function OnboardingCompletePage() {
             Workspace setup complete
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-zinc-400">
-            First-time setup is complete. Future sign-ins will route directly
-            to the authenticated workspace unless the mock session is reset.
+            First-time setup is complete. You can now continue to the focused
+            PRD workflow.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUserId } from "@/lib/auth/server-user";
 import { analyzeInitiative } from "@/lib/services/initiative-analysis";
 import { jsonError, parseId, toApiError } from "@/lib/validation/api";
 
@@ -19,7 +20,8 @@ export async function POST(_request: Request, context: RouteContext) {
       return jsonError("Invalid initiative id", 400);
     }
 
-    const analysis = await analyzeInitiative(id);
+    const userId = await requireUserId();
+    const analysis = await analyzeInitiative(userId, id);
 
     return NextResponse.json(analysis);
   } catch (error) {

@@ -4,27 +4,33 @@ import {
   getDocumentsForInitiative,
   getInitiative,
   getLatestInitiativeAnalysis,
-  saveGeneratedPrd
+  getClarificationAnswers,
+  saveGeneratedPrd,
+  upsertClarificationAnswers
 } from "./initiative-store";
 
 export async function generatePrd(
-  initiativeId: number,
+  userId: string,
+  initiativeId: string,
   clarificationAnswers: ClarificationAnswer[]
 ): Promise<GeneratedPrd> {
-  const initiative = getInitiative(initiativeId);
+  const initiative = await getInitiative(userId, initiativeId);
 
   if (!initiative) {
     throw new Error("INITIATIVE_NOT_FOUND");
   }
 
-  const documents = getDocumentsForInitiative(initiativeId);
-  const analysis = getLatestInitiativeAnalysis(initiativeId);
+  await upsertClarificationAnswers(userId, initiativeId, clarificationAnswers);
+
+  const documents = await getDocumentsForInitiative(userId, initiativeId);
+  const analysis = await getLatestInitiativeAnalysis(userId, initiativeId);
+  const persistedAnswers = await getClarificationAnswers(userId, initiativeId);
   const prd = await generatePrdWithAi({
     initiative,
     documents,
     analysis,
-    clarificationAnswers
+    clarificationAnswers: persistedAnswers
   });
 
-  return saveGeneratedPrd(prd);
+  return saveGeneratedPrd(userId, prd);
 }

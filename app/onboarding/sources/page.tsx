@@ -24,7 +24,7 @@ const sources = [
 
 export default function ConnectSourcesPage() {
   return (
-    <AuthGate onboardingOnly>
+    <AuthGate>
       <OnboardingShell
         currentStep={1}
         eyebrow="Connect sources"

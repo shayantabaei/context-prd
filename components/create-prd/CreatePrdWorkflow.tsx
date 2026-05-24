@@ -12,6 +12,7 @@ import {
   FileText,
   LockKeyhole,
   Loader2,
+  PencilLine,
   Save,
   Shield,
   Sparkles,
@@ -22,6 +23,9 @@ import {
   analyzeInitiativeRequest,
   createInitiativeRequest,
   generatePrdRequest,
+  getWorkflowStateRequest,
+  refinePrdSectionRequest,
+  saveClarificationAnswersRequest,
   updateInitiativeRequest,
   uploadContextDocumentsRequest
 } from "@/lib/client/create-prd-api";
@@ -49,7 +53,6 @@ import {
   type MetricEntry
 } from "./InitiativeDefinitionFields";
 import {
-  initialSelectedContext,
   workflowSteps,
   type SelectedContext
 } from "./workflow-data";
@@ -120,6 +123,15 @@ type AsyncState = {
   error?: string;
 };
 
+type ReadinessAssessment = {
+  score: number;
+  label: "Needs Clarification" | "Partially Ready" | "Ready for Generation";
+  tone: "blue" | "amber" | "green";
+  helper: string;
+  unresolvedHighCount: number;
+  unresolvedMediumCount: number;
+};
+
 type ExportState = {
   pdfLoading: boolean;
   error?: string;
@@ -181,6 +193,8 @@ const initialInitiativeDefinition: InitiativeDefinitionValues = {
   ]
 };
 
+const currentInitiativeStorageKey = "contextprd.currentInitiativeId";
+
 function toInitiativeRequest(
   values: InitiativeDefinitionValues
 ): CreateInitiativeRequest {
@@ -215,6 +229,62 @@ function toInitiativeRequest(
   };
 }
 
+function toMetricEntries(initiative: Initiative): MetricEntry[] {
+  return initiative.businessContext.successMetrics.map((metric, index) => ({
+    id: `metric-${index + 1}`,
+    metric: metric.metric,
+    target: metric.target
+  }));
+}
+
+function fromInitiative(initiative: Initiative): InitiativeDefinitionValues {
+  return {
+    initiativeName: initiative.initiativeName,
+    primaryTeam: initiative.metadata.team,
+    deliveryWorkflow: initiative.metadata.workflow,
+    outputTemplate: initiative.metadata.outputTemplateName,
+    executiveSummary: initiative.executiveSummary,
+    currentPainPoints: initiative.businessContext.painPoints,
+    desiredOutcomes: initiative.businessContext.outcomes,
+    successMetrics: toMetricEntries(initiative),
+    inScope: initiative.scope.inScope,
+    outOfScope: initiative.scope.outOfScope,
+    technicalConstraints: initiative.constraints.technicalConstraints,
+    governanceRequirements: initiative.constraints.governanceRequirements,
+    rolloutConstraints: initiative.constraints.rolloutConstraints
+  };
+}
+
+function toClarificationAnswers(
+  analysis: InitiativeAnalysis | undefined,
+  persistedAnswers: { questionId: string; answer: string }[]
+): ClarificationAnswer[] {
+  const answerByQuestionId = new Map(
+    persistedAnswers.map((answer) => [String(answer.questionId), answer.answer])
+  );
+
+  return (analysis?.clarificationQuestions ?? []).map((question) => ({
+    ...question,
+    answer: answerByQuestionId.get(String(question.id)) ?? ""
+  }));
+}
+
+function getExpandedQuestionId(questions: ClarificationAnswer[]): string {
+  const unansweredQuestion = questions.find((question) => !question.answer.trim());
+
+  return String(unansweredQuestion?.id ?? questions[0]?.id ?? "");
+}
+
+function documentsToSelectedContext(
+  documents: ContextDocument[]
+): SelectedContext[] {
+  return documents.map((document) => ({
+    id: document.id,
+    label: document.filename,
+    source: "Uploaded Documents"
+  }));
+}
+
 export function CreatePrdWorkflow() {
   const workflowTopRef = useRef<HTMLElement | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
@@ -230,11 +300,17 @@ export function CreatePrdWorkflow() {
   const [analysisState, setAnalysisState] = useState<AsyncState>({
     loading: false
   });
+  const [hydrationState, setHydrationState] = useState<AsyncState>({
+    loading: false
+  });
+  const [clarificationState, setClarificationState] = useState<AsyncState>({
+    loading: false
+  });
   const [generationState, setGenerationState] = useState<AsyncState>({
     loading: false
   });
   const [selectedContext, setSelectedContext] = useState<SelectedContext[]>(
-    initialSelectedContext
+    []
   );
   const [questions, setQuestions] = useState<ClarificationAnswer[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string>("");
@@ -256,6 +332,68 @@ export function CreatePrdWorkflow() {
     });
   }, [stepIndex]);
 
+  useEffect(() => {
+    const currentInitiativeId = window.localStorage.getItem(
+      currentInitiativeStorageKey
+    );
+
+    if (!currentInitiativeId) {
+      return;
+    }
+
+    const initiativeId = currentInitiativeId;
+    let cancelled = false;
+
+    async function hydrateWorkflow() {
+      setHydrationState({ loading: true });
+
+      try {
+        const workflowState = await getWorkflowStateRequest(initiativeId);
+
+        if (cancelled) {
+          return;
+        }
+
+        const hydratedQuestions = toClarificationAnswers(
+          workflowState.analysis,
+          workflowState.clarificationAnswers
+        );
+
+        setInitiative(workflowState.initiative);
+        setInitiativeDefinition(fromInitiative(workflowState.initiative));
+        setDocuments(workflowState.documents);
+        setSelectedContext(documentsToSelectedContext(workflowState.documents));
+        setAnalysis(workflowState.analysis ?? null);
+        setQuestions(hydratedQuestions);
+        setExpandedQuestionId(getExpandedQuestionId(hydratedQuestions));
+        setGeneratedPrd(workflowState.generatedPrd ?? null);
+        setHydrationState({
+          loading: false,
+          success: "Saved workflow loaded"
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        window.localStorage.removeItem(currentInitiativeStorageKey);
+        setHydrationState({
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Unable to load saved workflow"
+        });
+      }
+    }
+
+    void hydrateWorkflow();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function saveInitiative() {
     setSaveState({ loading: true });
 
@@ -266,6 +404,11 @@ export function CreatePrdWorkflow() {
         : await createInitiativeRequest(payload);
 
       setInitiative(savedInitiative);
+      setInitiativeDefinition(fromInitiative(savedInitiative));
+      window.localStorage.setItem(
+        currentInitiativeStorageKey,
+        savedInitiative.id
+      );
       setSaveState({
         loading: false,
         success: initiative ? "Initiative updated" : "Initiative saved"
@@ -298,7 +441,11 @@ export function CreatePrdWorkflow() {
         selectedFiles
       );
 
-      setDocuments((items) => [...items, ...uploadedDocuments]);
+      setDocuments((items) => {
+        const nextDocuments = [...items, ...uploadedDocuments];
+        setSelectedContext(documentsToSelectedContext(nextDocuments));
+        return nextDocuments;
+      });
       setSelectedFiles([]);
       setAnalysis(null);
       setQuestions([]);
@@ -394,6 +541,71 @@ export function CreatePrdWorkflow() {
     }
   }
 
+  async function refineGeneratedPrdSection(
+    sectionId: string,
+    instruction: string
+  ): Promise<PrdSection> {
+    if (!initiative || !generatedPrd) {
+      throw new Error("Generate a PRD before refining sections.");
+    }
+
+    const refinedSection = await refinePrdSectionRequest({
+      initiativeId: initiative.id,
+      prd: generatedPrd,
+      sectionId,
+      instruction,
+      clarificationAnswers: questions.map((question) => ({
+        questionId: question.id,
+        answer: question.answer
+      }))
+    });
+
+    setGeneratedPrd((currentPrd) =>
+      currentPrd
+        ? {
+            ...currentPrd,
+            sections: currentPrd.sections.map((section) =>
+              section.id === refinedSection.id ? refinedSection : section
+            )
+          }
+        : currentPrd
+    );
+
+    return refinedSection;
+  }
+
+  async function persistClarificationAnswers() {
+    if (!initiative || questions.length === 0) {
+      return true;
+    }
+
+    setClarificationState({ loading: true });
+
+    try {
+      await saveClarificationAnswersRequest(
+        initiative.id,
+        questions.map((question) => ({
+          questionId: question.id,
+          answer: question.answer
+        }))
+      );
+      setClarificationState({
+        loading: false,
+        success: "Clarification answers saved"
+      });
+      return true;
+    } catch (error) {
+      setClarificationState({
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to save clarification answers"
+      });
+      return false;
+    }
+  }
+
   async function nextStep() {
     if (currentStep.id === "setup") {
       const savedInitiative = await saveInitiative();
@@ -425,6 +637,14 @@ export function CreatePrdWorkflow() {
         error: "Run analysis before moving to output generation."
       });
       return;
+    }
+
+    if (currentStep.id === "clarify") {
+      const savedAnswers = await persistClarificationAnswers();
+
+      if (!savedAnswers) {
+        return;
+      }
     }
 
     setStepIndex((index) => Math.min(index + 1, workflowSteps.length - 1));
@@ -488,6 +708,10 @@ export function CreatePrdWorkflow() {
         <WorkflowProgress steps={workflowSteps} currentIndex={stepIndex} />
       </div>
 
+      <div className="mt-4">
+        <WorkflowNotice state={hydrationState} />
+      </div>
+
       <div className="mt-7">
         {currentStep.id === "setup" ? (
           <InitiativeSetup
@@ -522,12 +746,16 @@ export function CreatePrdWorkflow() {
           <ClarificationWorkflow
             questions={questions}
             expandedQuestionId={expandedQuestionId}
+            clarificationState={clarificationState}
             onExpand={setExpandedQuestionId}
             onAnswerChange={updateAnswer}
           />
         ) : null}
         {currentStep.id === "generate" ? (
           <GenerateOutputs
+            initiative={initiative}
+            analysis={analysis}
+            questions={questions}
             processedDocumentCount={processedDocumentCount}
             answeredCount={answeredCount}
             totalQuestions={questions.length}
@@ -535,6 +763,7 @@ export function CreatePrdWorkflow() {
             generatedPrd={generatedPrd}
             generationState={generationState}
             onGeneratePrd={generatePrdFromWorkflow}
+            onRefineSection={refineGeneratedPrdSection}
           />
         ) : null}
       </div>
@@ -571,6 +800,8 @@ export function CreatePrdWorkflow() {
                 saveState.loading ||
                 uploadState.loading ||
                 analysisState.loading ||
+                clarificationState.loading ||
+                hydrationState.loading ||
                 generationState.loading
               }
               className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-5 text-sm font-medium text-white transition hover:bg-blue-400"
@@ -1027,7 +1258,13 @@ function SeverityBadge({ severity }: { severity: "low" | "medium" | "high" }) {
   );
 }
 
-function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
+function GeneratedPrdPreview({
+  prd,
+  onRefineSection
+}: {
+  prd: GeneratedPrd;
+  onRefineSection: (sectionId: string, instruction: string) => Promise<PrdSection>;
+}) {
   const [exportState, setExportState] = useState<ExportState>({
     pdfLoading: false
   });
@@ -1101,7 +1338,11 @@ function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
         </p>
         <div className="mt-8 divide-y divide-white/10">
           {prd.sections.map((section) => (
-            <PrdDocumentSection key={section.id} section={section} />
+            <PrdDocumentSection
+              key={section.id}
+              section={section}
+              onRefineSection={onRefineSection}
+            />
           ))}
         </div>
         <div className="mt-8 border-t border-white/10 pt-6">
@@ -1128,15 +1369,127 @@ function GeneratedPrdPreview({ prd }: { prd: GeneratedPrd }) {
   );
 }
 
-function PrdDocumentSection({ section }: { section: PrdSection }) {
+function PrdDocumentSection({
+  section,
+  onRefineSection
+}: {
+  section: PrdSection;
+  onRefineSection: (sectionId: string, instruction: string) => Promise<PrdSection>;
+}) {
+  const [isRefining, setIsRefining] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [refinementState, setRefinementState] = useState<AsyncState>({
+    loading: false
+  });
+
+  async function applyRefinement() {
+    const trimmedInstruction = instruction.trim();
+
+    if (!trimmedInstruction) {
+      setRefinementState({
+        loading: false,
+        error: "Add refinement instructions before applying."
+      });
+      return;
+    }
+
+    setRefinementState({ loading: true });
+
+    try {
+      await onRefineSection(section.id, trimmedInstruction);
+      setInstruction("");
+      setIsRefining(false);
+      setRefinementState({
+        loading: false,
+        success: "Section refined"
+      });
+    } catch (error) {
+      setRefinementState({
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to refine section"
+      });
+    }
+  }
+
   return (
     <section className="py-6 first:pt-0 last:pb-0">
-      <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-50">
-        {section.title}
-      </h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-50">
+          {section.title}
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            setIsRefining((value) => !value);
+            setRefinementState({ loading: false });
+          }}
+          className="inline-flex h-8 items-center justify-center gap-2 self-start rounded-md border border-zinc-700 bg-zinc-900/40 px-2.5 text-xs font-medium text-zinc-400 transition hover:border-zinc-500 hover:text-white"
+        >
+          <PencilLine className="h-3.5 w-3.5" strokeWidth={1.8} />
+          Refine
+        </button>
+      </div>
       <p className="mt-3 whitespace-pre-line text-sm leading-7 text-zinc-300">
         {section.content}
       </p>
+      {isRefining ? (
+        <div className="mt-4 rounded-lg border border-line bg-[#101014] p-3">
+          <label
+            htmlFor={`refine-${section.id}`}
+            className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500"
+          >
+            Refinement instructions
+          </label>
+          <textarea
+            id={`refine-${section.id}`}
+            value={instruction}
+            rows={3}
+            onChange={(event) => setInstruction(event.target.value)}
+            placeholder="Tell ContextPRD how to improve this section..."
+            className="mt-2 w-full resize-none rounded-md border border-line bg-[#09090b] px-3 py-2 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-blue-500/60"
+          />
+          {refinementState.error ? (
+            <p className="mt-2 text-xs leading-5 text-red-200">
+              {refinementState.error}
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={applyRefinement}
+              disabled={refinementState.loading}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {refinementState.loading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.8} />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
+              )}
+              Apply Refinement
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInstruction("");
+                setIsRefining(false);
+                setRefinementState({ loading: false });
+              }}
+              disabled={refinementState.loading}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900/40 px-3 text-xs font-medium text-zinc-400 transition hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {refinementState.success && !isRefining ? (
+        <p className="mt-3 text-xs leading-5 text-emerald-300">
+          {refinementState.success}
+        </p>
+      ) : null}
       <details className="mt-4">
         <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.14em] text-zinc-600 transition hover:text-zinc-400">
           Source references
@@ -1358,15 +1711,19 @@ function ContextSources({
           title="Selected context"
           description="Remove documents that should not influence analysis or generation."
         >
-          <div className="space-y-2">
-            {selectedContext.map((item) => (
-              <ContextPill
-                key={item.id}
-                item={item}
-                onRemove={() => onRemoveContext(item.id)}
-              />
-            ))}
-          </div>
+          {selectedContext.length > 0 ? (
+            <div className="space-y-2">
+              {selectedContext.map((item) => (
+                <ContextPill
+                  key={item.id}
+                  item={item}
+                  onRemove={() => onRemoveContext(item.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState message="Uploaded documents will appear here after they are saved." />
+          )}
         </SectionPanel>
 
         <SectionPanel title="Context window usage">
@@ -1510,11 +1867,13 @@ function AiAnalysis({
 function ClarificationWorkflow({
   questions,
   expandedQuestionId,
+  clarificationState,
   onExpand,
   onAnswerChange
 }: {
   questions: ClarificationAnswer[];
   expandedQuestionId: string;
+  clarificationState: AsyncState;
   onExpand: (id: string) => void;
   onAnswerChange: (id: string, answer: string) => void;
 }) {
@@ -1523,6 +1882,7 @@ function ClarificationWorkflow({
       title="Clarification workflow"
       description="Resolve ambiguity through structured human-in-the-loop refinement. Each question remains tied to the context that informed it."
     >
+      <WorkflowNotice state={clarificationState} />
       {questions.length === 0 ? (
         <EmptyState message="Run analysis first to populate clarification questions." />
       ) : (
@@ -1617,15 +1977,161 @@ function ClarificationWorkflow({
   );
 }
 
+function getInitiativeCompletenessScore(initiative: Initiative | null): number {
+  if (!initiative) {
+    return 0;
+  }
+
+  const checks = [
+    initiative.initiativeName.trim(),
+    initiative.executiveSummary.trim(),
+    initiative.metadata.team.trim(),
+    initiative.metadata.workflow.trim(),
+    initiative.metadata.outputTemplateName.trim(),
+    initiative.businessContext.painPoints.length > 0,
+    initiative.businessContext.outcomes.trim(),
+    initiative.businessContext.successMetrics.length > 0,
+    initiative.scope.inScope.length > 0,
+    initiative.scope.outOfScope.length > 0,
+    initiative.constraints.technicalConstraints.length > 0,
+    initiative.constraints.governanceRequirements.length > 0,
+    initiative.constraints.rolloutConstraints.length > 0
+  ];
+  const completed = checks.filter(Boolean).length;
+
+  return Math.round((completed / checks.length) * 22);
+}
+
+function getQuestionWeight(severity: ClarificationAnswer["severity"]): number {
+  if (severity === "high") {
+    return 3;
+  }
+
+  if (severity === "medium") {
+    return 2;
+  }
+
+  return 1;
+}
+
+function assessReadiness({
+  initiative,
+  analysis,
+  questions,
+  processedDocumentCount
+}: {
+  initiative: Initiative | null;
+  analysis: InitiativeAnalysis | null;
+  questions: ClarificationAnswer[];
+  processedDocumentCount: number;
+}): ReadinessAssessment {
+  const initiativeScore = getInitiativeCompletenessScore(initiative);
+  const documentScore =
+    processedDocumentCount === 0
+      ? 0
+      : processedDocumentCount === 1
+        ? 10
+        : processedDocumentCount === 2
+          ? 14
+          : 16;
+  const analysisScore = analysis ? 14 : 0;
+  const totalQuestionWeight = questions.reduce(
+    (sum, question) => sum + getQuestionWeight(question.severity),
+    0
+  );
+  const answeredQuestionWeight = questions.reduce(
+    (sum, question) =>
+      question.answer.trim()
+        ? sum + getQuestionWeight(question.severity)
+        : sum,
+    0
+  );
+  const clarificationScore =
+    questions.length === 0
+      ? analysis
+        ? 38
+        : 0
+      : Math.round((answeredQuestionWeight / totalQuestionWeight) * 43);
+  const unresolvedQuestions = questions.filter(
+    (question) => !question.answer.trim()
+  );
+  const unresolvedHighCount = unresolvedQuestions.filter(
+    (question) => question.severity === "high"
+  ).length;
+  const unresolvedMediumCount = unresolvedQuestions.filter(
+    (question) => question.severity === "medium"
+  ).length;
+  const unresolvedLowCount = unresolvedQuestions.filter(
+    (question) => question.severity === "low"
+  ).length;
+  const ambiguityPenalty = Math.min(
+    30,
+    unresolvedHighCount * 10 +
+      unresolvedMediumCount * 5 +
+      unresolvedLowCount * 2
+  );
+  const rawScore =
+    initiativeScore +
+    documentScore +
+    analysisScore +
+    clarificationScore -
+    ambiguityPenalty;
+  const floor = analysis ? 35 : initiative ? 20 : 0;
+  const score = Math.max(floor, Math.min(95, rawScore));
+
+  if (unresolvedHighCount > 0 || score < 60) {
+    return {
+      score,
+      label: "Needs Clarification",
+      tone: "amber",
+      helper:
+        unresolvedHighCount > 0
+          ? "Critical ambiguity remains unresolved. Answer high-severity clarification questions before relying on generated requirements."
+          : "Additional clarification is recommended before generation.",
+      unresolvedHighCount,
+      unresolvedMediumCount
+    };
+  }
+
+  if (unresolvedMediumCount > 0 || score < 85) {
+    return {
+      score,
+      label: "Partially Ready",
+      tone: "amber",
+      helper:
+        "Some ambiguity remains. The PRD can be generated, but resolving more clarification questions will improve implementation readiness.",
+      unresolvedHighCount,
+      unresolvedMediumCount
+    };
+  }
+
+  return {
+    score,
+    label: "Ready for Generation",
+    tone: "green",
+    helper:
+      "Initiative is sufficiently refined for PRD generation. Most critical ambiguity has been resolved.",
+    unresolvedHighCount,
+    unresolvedMediumCount
+  };
+}
+
 function GenerateOutputs({
+  initiative,
+  analysis,
+  questions,
   processedDocumentCount,
   answeredCount,
   totalQuestions,
   canGenerate,
   generatedPrd,
   generationState,
-  onGeneratePrd
+  onGeneratePrd,
+  onRefineSection
 }: {
+  initiative: Initiative | null;
+  analysis: InitiativeAnalysis | null;
+  questions: ClarificationAnswer[];
   processedDocumentCount: number;
   answeredCount: number;
   totalQuestions: number;
@@ -1633,7 +2139,15 @@ function GenerateOutputs({
   generatedPrd: GeneratedPrd | null;
   generationState: AsyncState;
   onGeneratePrd: () => void;
+  onRefineSection: (sectionId: string, instruction: string) => Promise<PrdSection>;
 }) {
+  const readiness = assessReadiness({
+    initiative,
+    analysis,
+    questions,
+    processedDocumentCount
+  });
+
   return (
     <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
       <div className="space-y-5">
@@ -1641,21 +2155,37 @@ function GenerateOutputs({
           <div className="space-y-3">
             <StatusMeter
               label="Readiness score"
-              value={Math.min(95, 35 + processedDocumentCount * 15 + answeredCount * 10)}
-              tone={totalQuestions > 0 && answeredCount === totalQuestions ? "green" : "amber"}
-              helper="Readiness reflects processed context, analysis signals, and clarification coverage before PRD generation."
+              value={readiness.score}
+              tone={readiness.tone}
+              helper={readiness.helper}
             />
             <div className="grid gap-2">
+              <Badge
+                icon={
+                  readiness.label === "Ready for Generation"
+                    ? CheckCircle2
+                    : AlertTriangle
+                }
+              >
+                {generatedPrd ? "PRD generated" : readiness.label}
+              </Badge>
               <Badge icon={FileText}>
                 {processedDocumentCount} processed document{processedDocumentCount === 1 ? "" : "s"}
               </Badge>
               <Badge icon={CheckCircle2}>
                 {answeredCount}/{totalQuestions} clarifications complete
               </Badge>
+              {readiness.unresolvedHighCount > 0 ? (
+                <Badge icon={AlertTriangle}>
+                  {readiness.unresolvedHighCount} high-severity clarification{readiness.unresolvedHighCount === 1 ? "" : "s"} unresolved
+                </Badge>
+              ) : null}
+              {readiness.unresolvedMediumCount > 0 ? (
+                <Badge icon={AlertTriangle}>
+                  {readiness.unresolvedMediumCount} medium-severity clarification{readiness.unresolvedMediumCount === 1 ? "" : "s"} unresolved
+                </Badge>
+              ) : null}
               <Badge icon={Shield}>Governance checks available in analysis</Badge>
-              <Badge icon={AlertTriangle}>
-                {generatedPrd ? "PRD generated" : "PRD generation ready"}
-              </Badge>
             </div>
           </div>
         </SectionPanel>
@@ -1684,6 +2214,13 @@ function GenerateOutputs({
               Run analysis before generating a PRD.
             </p>
           ) : null}
+          {canGenerate && readiness.label !== "Ready for Generation" ? (
+            <p className="mt-3 text-xs leading-5 text-amber-300">
+              {readiness.label === "Needs Clarification"
+                ? "Generation is available, but critical ambiguity should be resolved first for a stronger PRD."
+                : "Generation is available, but additional clarification will improve the PRD."}
+            </p>
+          ) : null}
         </SectionPanel>
       </div>
 
@@ -1702,7 +2239,12 @@ function GenerateOutputs({
           )}
         </SectionPanel>
 
-        {generatedPrd ? <GeneratedPrdPreview prd={generatedPrd} /> : null}
+        {generatedPrd ? (
+          <GeneratedPrdPreview
+            prd={generatedPrd}
+            onRefineSection={onRefineSection}
+          />
+        ) : null}
       </div>
     </div>
   );
