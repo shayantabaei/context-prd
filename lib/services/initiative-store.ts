@@ -17,139 +17,15 @@ import type {
   PrdSection,
   UpdateInitiativeRequest
 } from "@/lib/types/initiative";
+import { replacePrdSection } from "@/lib/prd/refinement";
+import { hydrateInitiative } from "@/lib/workflow/initiative-hydration";
 
 function toIsoDate(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function stringValue(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
-function mapInitiativeMetadata(value: unknown): Initiative["metadata"] {
-  const metadata =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-
-  return {
-    team: stringValue("team" in metadata ? metadata.team : undefined),
-    workflow: stringValue("workflow" in metadata ? metadata.workflow : undefined),
-    outputTemplateName: stringValue(
-      "outputTemplateName" in metadata
-        ? metadata.outputTemplateName
-        : undefined
-    )
-  };
-}
-
-function mapBusinessContext(value: unknown): Initiative["businessContext"] {
-  const context =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const rawMetrics =
-    "successMetrics" in context && Array.isArray(context.successMetrics)
-      ? context.successMetrics
-      : [];
-
-  return {
-    painPoints: stringArray("painPoints" in context ? context.painPoints : undefined),
-    outcomes: stringValue("outcomes" in context ? context.outcomes : undefined),
-    successMetrics: rawMetrics
-      .filter((metric) => metric && typeof metric === "object")
-      .map((metric) => ({
-        metric: stringValue(
-          "metric" in metric
-            ? (metric as Record<string, unknown>).metric
-            : undefined
-        ),
-        target: stringValue(
-          "target" in metric
-            ? (metric as Record<string, unknown>).target
-            : undefined
-        )
-      }))
-      .filter((metric) => metric.metric || metric.target)
-  };
-}
-
-function mapScope(value: unknown): Initiative["scope"] {
-  const scope =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-
-  return {
-    inScope: stringArray("inScope" in scope ? scope.inScope : undefined),
-    outOfScope: stringArray("outOfScope" in scope ? scope.outOfScope : undefined)
-  };
-}
-
-function mapConstraints(value: unknown): Initiative["constraints"] {
-  const constraints =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-
-  return {
-    technicalConstraints: stringArray(
-      "technicalConstraints" in constraints
-        ? constraints.technicalConstraints
-        : undefined
-    ),
-    governanceRequirements: stringArray(
-      "governanceRequirements" in constraints
-        ? constraints.governanceRequirements
-        : undefined
-    ),
-    rolloutConstraints: stringArray(
-      "rolloutConstraints" in constraints
-        ? constraints.rolloutConstraints
-        : undefined
-    )
-  };
-}
-
-function mapDependencies(value: unknown): Initiative["dependencies"] {
-  return Array.isArray(value)
-    ? value
-        .filter((dependency) => dependency && typeof dependency === "object")
-        .map((dependency) => ({
-          system: stringValue(
-            "system" in dependency
-              ? (dependency as Record<string, unknown>).system
-              : undefined
-          ),
-          impact:
-            "impact" in dependency &&
-            ["low", "medium", "high"].includes(
-              String((dependency as Record<string, unknown>).impact)
-            )
-              ? ((dependency as Record<string, unknown>).impact as
-                  | "low"
-                  | "medium"
-                  | "high")
-              : "medium",
-          description: stringValue(
-            "description" in dependency
-              ? (dependency as Record<string, unknown>).description
-              : undefined
-          )
-        }))
-        .filter((dependency) => dependency.system)
-    : [];
-}
-
 function mapInitiative(row: typeof initiatives.$inferSelect): Initiative {
-  return {
-    id: row.id,
-    initiativeName: row.initiativeName,
-    executiveSummary: row.executiveSummary,
-    metadata: mapInitiativeMetadata(row.metadata),
-    businessContext: mapBusinessContext(row.businessContext),
-    scope: mapScope(row.scope),
-    constraints: mapConstraints(row.constraints),
-    dependencies: mapDependencies(row.dependencies)
-  };
+  return hydrateInitiative(row);
 }
 
 function mapDocument(row: typeof contextDocuments.$inferSelect): ContextDocument {
@@ -466,9 +342,7 @@ export async function updateLatestGeneratedPrdSection({
     throw new Error("PRD_NOT_FOUND");
   }
 
-  const sections = currentPrd.sections.map((item) =>
-    item.id === section.id ? section : item
-  );
+  const sections = replacePrdSection(mapGeneratedPrd(currentPrd), section).sections;
 
   const [updatedPrd] = await db
     .update(generatedPrds)
