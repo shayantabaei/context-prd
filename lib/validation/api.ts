@@ -24,6 +24,10 @@ export function toApiError(error: unknown) {
       return jsonError("Initiative not found", 404);
     }
 
+    if (error.message === "PRD_SECTION_NOT_FOUND") {
+      return jsonError("PRD section not found", 404);
+    }
+
     return jsonError(error.message, 500);
   }
 

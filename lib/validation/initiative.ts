@@ -135,3 +135,14 @@ export const generatedPrdSchema = z.object({
   openQuestions: z.array(nonEmptyString),
   generatedAt: z.string().datetime()
 });
+
+export const refinePrdSectionRequestSchema = z.object({
+  prd: generatedPrdSchema,
+  sectionId: nonEmptyString,
+  instruction: nonEmptyString,
+  clarificationAnswers: z.array(clarificationAnswerSchema).optional()
+});
+
+export const refinePrdSectionResponseSchema = z.object({
+  section: prdSectionSchema
+});

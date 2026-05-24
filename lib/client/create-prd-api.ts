@@ -4,6 +4,7 @@ import type {
   GeneratedPrd,
   Initiative,
   InitiativeAnalysis,
+  PrdSection,
   UpdateInitiativeRequest,
   UploadContextResponse
 } from "@/lib/types/initiative";
@@ -95,4 +96,38 @@ export async function generatePrdRequest(
   });
 
   return parseApiResponse<GeneratedPrd>(response);
+}
+
+export async function refinePrdSectionRequest({
+  initiativeId,
+  prd,
+  sectionId,
+  instruction,
+  clarificationAnswers
+}: {
+  initiativeId: number;
+  prd: GeneratedPrd;
+  sectionId: string;
+  instruction: string;
+  clarificationAnswers: { questionId: number; answer: string }[];
+}): Promise<PrdSection> {
+  const response = await fetch(
+    `/api/initiatives/${initiativeId}/refine-prd-section`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        prd,
+        sectionId,
+        instruction,
+        clarificationAnswers
+      })
+    }
+  );
+
+  const payload = await parseApiResponse<{ section: PrdSection }>(response);
+
+  return payload.section;
 }
