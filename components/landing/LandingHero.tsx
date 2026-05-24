@@ -1,4 +1,5 @@
-import { FileText, Menu, Sparkles, Workflow } from "lucide-react";
+import { Menu, Sparkles, Workflow } from "lucide-react";
+import { BrandMark } from "@/components/onboarding/BrandMark";
 import { ProductMockup } from "./ProductMockup";
 
 export function LandingHero() {
@@ -6,16 +7,7 @@ export function LandingHero() {
     <section className="relative border-b border-line">
       <header className="border-b border-white/10 bg-[#0b0b0d]">
         <div className="mx-auto grid h-14 max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-5 sm:px-8 lg:grid-cols-[1fr_auto_1fr] lg:px-10">
-          <a
-            href="#"
-            className="flex items-center gap-3"
-            aria-label="ContextPRD home"
-          >
-            <FileText className="h-5 w-5 text-blue-400" strokeWidth={1.9} />
-            <span className="text-sm font-semibold tracking-[-0.01em] text-white">
-              ContextPRD
-            </span>
-          </a>
+          <BrandMark />
 
           <nav className="hidden items-center justify-center gap-8 text-sm font-medium text-zinc-300 lg:flex">
             <a href="#workflow" className="transition hover:text-white">
