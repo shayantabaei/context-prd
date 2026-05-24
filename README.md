@@ -24,3 +24,12 @@ Drizzle Studio is available with:
 ```bash
 npm run db:studio
 ```
+
+## Testing
+
+ContextPRD uses Vitest for focused workflow and service tests.
+
+```bash
+npm run test
+npm run test:coverage
+```
