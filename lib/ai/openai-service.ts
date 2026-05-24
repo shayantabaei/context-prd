@@ -30,6 +30,107 @@ function parseJsonObject(content: string): unknown {
   }
 }
 
+function createDocumentIdLookup(documents: ContextDocument[]) {
+  const lookup = new Map<string, string>();
+
+  documents.forEach((document, index) => {
+    lookup.set(document.id, document.id);
+    lookup.set(String(index + 1), document.id);
+    lookup.set(document.filename, document.id);
+  });
+
+  return lookup;
+}
+
+function normalizeOptionalDocumentId(
+  value: unknown,
+  documentIdLookup: Map<string, string>
+) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  return documentIdLookup.get(String(value)) ?? value;
+}
+
+function normalizeRelatedDocuments(
+  value: unknown,
+  documentIdLookup: Map<string, string>
+) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const normalized = value
+    .map((documentId) =>
+      normalizeOptionalDocumentId(documentId, documentIdLookup)
+    )
+    .filter(Boolean);
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function normalizeAnalysisReferencesForValidation(
+  parsedObject: Record<string, unknown>,
+  documents: ContextDocument[]
+) {
+  const documentIdLookup = createDocumentIdLookup(documents);
+  const normalizeDocumentAnalysis = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) =>
+          item && typeof item === "object"
+            ? {
+                ...item,
+                documentId: normalizeOptionalDocumentId(
+                  (item as Record<string, unknown>).documentId,
+                  documentIdLookup
+                )
+              }
+            : item
+        )
+      : value;
+  const normalizeFindings = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) =>
+          item && typeof item === "object"
+            ? {
+                ...item,
+                relatedDocuments: normalizeRelatedDocuments(
+                  (item as Record<string, unknown>).relatedDocuments,
+                  documentIdLookup
+                )
+              }
+            : item
+        )
+      : value;
+  const normalizeQuestions = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) =>
+          item && typeof item === "object"
+            ? {
+                ...item,
+                documentId: normalizeOptionalDocumentId(
+                  (item as Record<string, unknown>).documentId,
+                  documentIdLookup
+                )
+              }
+            : item
+        )
+      : value;
+
+  return {
+    ...parsedObject,
+    documentAnalysis: normalizeDocumentAnalysis(parsedObject.documentAnalysis),
+    irrelevantContext: normalizeDocumentAnalysis(parsedObject.irrelevantContext),
+    detectedGaps: normalizeFindings(parsedObject.detectedGaps),
+    detectedRisks: normalizeFindings(parsedObject.detectedRisks),
+    inferredDependencies: normalizeFindings(parsedObject.inferredDependencies),
+    clarificationQuestions: normalizeQuestions(
+      parsedObject.clarificationQuestions
+    )
+  } as Record<string, unknown>;
+}
+
 export async function analyzeInitiativeWithAi(
   initiative: Initiative,
   documents: ContextDocument[]
@@ -95,12 +196,16 @@ export async function analyzeInitiativeWithAi(
       ? (parsed as Record<string, unknown>)
       : {};
 
+  const normalizedAnalysis = normalizeAnalysisReferencesForValidation(
+    parsedObject,
+    documents
+  );
   const analysis = initiativeAnalysisSchema.parse({
-    ...parsedObject,
+    ...normalizedAnalysis,
     initiativeId: initiative.id,
     createdAt:
-      typeof parsedObject.createdAt === "string"
-        ? parsedObject.createdAt
+      typeof normalizedAnalysis.createdAt === "string"
+        ? normalizedAnalysis.createdAt
         : new Date().toISOString()
   });
 

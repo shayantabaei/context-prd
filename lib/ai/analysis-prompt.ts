@@ -15,6 +15,8 @@ export function buildInitiativeAnalysisPrompt(
       document.extractedText?.slice(0, maxDocumentCharacters) ||
       "[No extracted text available]"
   }));
+  const exampleDocumentId =
+    documents[0]?.id ?? "11111111-1111-4111-8111-111111111111";
 
   return [
     "You are ContextPRD, an enterprise initiative analysis system.",
@@ -32,6 +34,11 @@ export function buildInitiativeAnalysisPrompt(
     "- delivery, technical, rollout, and governance risks",
     "- inferred dependencies between systems",
     "- highly specific clarification questions that materially improve future PRD quality",
+    "",
+    "Document reference requirements:",
+    "- documentId and relatedDocuments MUST use the exact string id from the uploaded context documents.",
+    "- Do not use numeric document indexes such as 1, 2, or 3.",
+    "- If a finding is not grounded in a specific document, omit relatedDocuments.",
     "",
     "Document relevance scoring requirements:",
     "- relevancyScore MUST be a normalized decimal from 0.0 to 1.0, not a percentage.",
@@ -71,7 +78,7 @@ export function buildInitiativeAnalysisPrompt(
         initiativeId: initiative.id,
         documentAnalysis: [
           {
-            documentId: 1,
+            documentId: exampleDocumentId,
             filename: "example.md",
             relevancyScore: 0.85,
             summary: "string",
@@ -82,7 +89,7 @@ export function buildInitiativeAnalysisPrompt(
         ],
         irrelevantContext: [
           {
-            documentId: 1,
+            documentId: exampleDocumentId,
             filename: "example.md",
             reason: "string",
             irrelevantTopics: ["string"]
@@ -94,7 +101,7 @@ export function buildInitiativeAnalysisPrompt(
             description: "string",
             severity: "low | medium | high",
             category: "gap",
-            relatedDocuments: [1],
+            relatedDocuments: [exampleDocumentId],
             relatedSystems: ["string"],
             recommendation: "string"
           }
@@ -105,7 +112,7 @@ export function buildInitiativeAnalysisPrompt(
             description: "string",
             severity: "low | medium | high",
             category: "risk | governance | rollout | technical",
-            relatedDocuments: [1],
+            relatedDocuments: [exampleDocumentId],
             relatedSystems: ["string"],
             recommendation: "string"
           }
@@ -116,7 +123,7 @@ export function buildInitiativeAnalysisPrompt(
             description: "string",
             severity: "low | medium | high",
             category: "dependency",
-            relatedDocuments: [1],
+            relatedDocuments: [exampleDocumentId],
             relatedSystems: ["string"],
             recommendation: "string"
           }
@@ -124,7 +131,7 @@ export function buildInitiativeAnalysisPrompt(
         clarificationQuestions: [
           {
             id: 1,
-            documentId: 1,
+            documentId: exampleDocumentId,
             question: "string",
             rationale: "string",
             category:

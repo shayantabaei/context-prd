@@ -1,0 +1,10 @@
+Mobile App Release Notes - Version 4.8
+
+This release includes changes to push notification preferences, dark mode support, mobile dashboard card ordering, and local caching for the deprecated field services module.
+
+Known issues:
+- Android users may need to clear app cache after upgrade.
+- Offline mode does not sync photos larger than 25MB.
+- Legacy mobile admin role table references are historical only and should not be used for new access control decisions.
+
+This document should mostly be irrelevant to a Partner Billing Permissions PRD, except for the warning that legacy mobile admin role tables are deprecated.
